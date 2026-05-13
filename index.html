@@ -269,11 +269,25 @@
       margin-bottom: 12px;
     }
     .time-sep { text-align: center; color: var(--text-3); font-size: 14px; padding-bottom: 10px; }
-    .time-input-wrap { display: flex; gap: 4px; align-items: center; }
-    .time-input-wrap input { flex: 1; }
+    .time-toggle { display: flex; align-items: center; gap: 4px; }
+    .time-toggle-part { display: flex; align-items: center; gap: 2px; background: var(--bg-input); border-radius: 10px; padding: 2px; }
+    .tt-btn {
+      width: 36px; height: 36px;
+      border: none; border-radius: 8px;
+      background: transparent;
+      color: var(--accent);
+      font-size: 18px; font-weight: 700;
+      cursor: pointer; font-family: inherit;
+      display: flex; align-items: center; justify-content: center;
+      -webkit-tap-highlight-color: transparent;
+      transition: background .1s;
+    }
+    .tt-btn:active { background: var(--accent); color: #fff; }
+    .tt-val { min-width: 28px; text-align: center; font-size: 20px; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--text-1); }
+    .tt-colon { font-size: 20px; font-weight: 700; color: var(--text-2); padding: 0 1px; }
     .now-btn {
       flex-shrink: 0;
-      padding: 0 8px;
+      padding: 0 10px;
       height: 40px;
       border-radius: 8px;
       font-size: 12px;
@@ -1101,10 +1115,66 @@ function defaultHour() {
   const now = new Date();
   return `${pad(now.getHours())}:00`;
 }
+function timePicker(id, initVal) {
+  let h, m;
+  if (initVal && initVal.includes(':')) {
+    [h, m] = initVal.split(':');
+  } else if (initVal === '') {
+    h = ''; m = '';
+  } else {
+    const now = new Date();
+    h = pad(now.getHours()); m = '00';
+  }
+  const hDisp = h === '' ? '--' : h;
+  const mDisp = m === '' ? '--' : m;
+  const hv = h === '' ? '' : h;
+  const mv = m === '' ? '' : m;
+  return `
+    <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+      <div class="time-toggle">
+        <div class="time-toggle-part">
+          <button class="tt-btn" onclick="incrTime('${id}','h',-1)">−</button>
+          <span class="tt-val" id="${id}-h">${hDisp}</span>
+          <button class="tt-btn" onclick="incrTime('${id}','h',1)">＋</button>
+        </div>
+        <span class="tt-colon">:</span>
+        <div class="time-toggle-part">
+          <button class="tt-btn" onclick="incrTime('${id}','m',-5)">−</button>
+          <span class="tt-val" id="${id}-m">${mDisp}</span>
+          <button class="tt-btn" onclick="incrTime('${id}','m',5)">＋</button>
+        </div>
+        <input type="hidden" id="${id}" value="${hv && mv ? hv+':'+mv : ''}">
+      </div>
+      <button class="now-btn" onclick="setNow('${id}')">今</button>
+    </div>`;
+}
+function incrTime(id, part, delta) {
+  const el = document.getElementById(`${id}-${part}`);
+  const hidden = document.getElementById(id);
+  if (!el) return;
+  const cur = el.textContent;
+  let v = cur === '--' ? (part === 'h' ? new Date().getHours() : 0) : parseInt(cur, 10);
+  if (part === 'h') {
+    v = (v + delta + 24) % 24;
+  } else {
+    v = ((v + delta) % 60 + 60) % 60;
+  }
+  el.textContent = pad(v);
+  const hEl = document.getElementById(`${id}-h`);
+  const mEl = document.getElementById(`${id}-m`);
+  if (hidden && hEl && mEl && hEl.textContent !== '--' && mEl.textContent !== '--') {
+    hidden.value = `${hEl.textContent}:${mEl.textContent}`;
+  }
+}
 function setNow(id) {
   const now = new Date();
-  const el = document.getElementById(id);
-  if (el) el.value = `${pad(now.getHours())}:${pad(now.getMinutes())}`;
+  const h = pad(now.getHours()), m = pad(now.getMinutes());
+  const hEl = document.getElementById(`${id}-h`);
+  const mEl = document.getElementById(`${id}-m`);
+  const hidden = document.getElementById(id);
+  if (hEl) hEl.textContent = h;
+  if (mEl) mEl.textContent = m;
+  if (hidden) hidden.value = `${h}:${m}`;
 }
 
 function logForm(log, idx, ctx) {
@@ -1123,18 +1193,12 @@ function logForm(log, idx, ctx) {
       <div class="time-row">
         <div>
           <label>開始</label>
-          <div class="time-input-wrap">
-            <input type="time" id="${pfx}-start" value="${esc(l.start)}">
-            <button class="now-btn" onclick="setNow('${pfx}-start')">今</button>
-          </div>
+          ${timePicker(pfx+'-start', l.start)}
         </div>
         <div class="time-sep">〜</div>
         <div>
           <label>終了</label>
-          <div class="time-input-wrap">
-            <input type="time" id="${pfx}-end" value="${esc(l.end)}">
-            <button class="now-btn" onclick="setNow('${pfx}-end')">今</button>
-          </div>
+          ${timePicker(pfx+'-end', l.end)}
         </div>
       </div>
       <div class="field">
