@@ -484,6 +484,76 @@
     }
     #offline-bar.show { display: block; }
 
+    /* ===== Mode toggle (日次/週次) ===== */
+    .mode-toggle {
+      display: flex; gap: 0; margin-bottom: 16px;
+      background: var(--bg-input); border-radius: 8px; padding: 3px;
+    }
+    .mode-btn {
+      flex: 1; padding: 7px; border: none; border-radius: 6px;
+      font-size: 13px; font-weight: 500; cursor: pointer;
+      background: transparent; color: var(--text-2); font-family: inherit;
+      transition: all 0.15s; -webkit-tap-highlight-color: transparent;
+    }
+    .mode-btn.active { background: var(--bg-card); color: var(--text); }
+
+    /* ===== Week nav ===== */
+    .week-nav {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 20px;
+    }
+    .week-nav-btn {
+      width: 36px; height: 36px; border-radius: 8px;
+      background: var(--bg-input); border: none; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      color: var(--text-2); -webkit-tap-highlight-color: transparent;
+    }
+    .week-nav-btn:active { opacity: 0.7; }
+    .week-label { font-size: 15px; font-weight: 600; }
+
+    /* ===== Day section in week view ===== */
+    .week-day { margin-bottom: 16px; }
+    .week-day-head {
+      font-size: 13px; font-weight: 600; color: var(--text-2);
+      margin-bottom: 6px; display: flex; align-items: center; gap: 6px;
+    }
+    .week-day-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--text-3); }
+
+    /* ===== Goal cards ===== */
+    .goal-card {
+      background: var(--bg-card); border: 1px solid var(--border);
+      border-radius: 12px; padding: 16px; margin-bottom: 12px;
+    }
+    .goal-card-head {
+      display: flex; align-items: flex-start;
+      justify-content: space-between; margin-bottom: 12px;
+    }
+    .goal-title { font-size: 16px; font-weight: 600; }
+    .goal-meta { font-size: 12px; color: var(--text-3); margin-top: 2px; }
+    .goal-actions { display: flex; gap: 2px; flex-shrink: 0; }
+
+    /* Key Results */
+    .kr-item { margin-bottom: 10px; }
+    .kr-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; }
+    .kr-text { font-size: 13px; color: var(--text-2); flex: 1; }
+    .kr-val  { font-size: 12px; color: var(--text-3); font-variant-numeric: tabular-nums; margin-left: 8px; flex-shrink: 0; }
+    .progress-bar { height: 6px; background: var(--bg-input); border-radius: 3px; overflow: hidden; }
+    .progress-fill { height: 100%; background: var(--c-research); border-radius: 3px; transition: width 0.3s; }
+    .kr-binary { display: flex; align-items: center; gap: 8px; }
+
+    /* Add Goal form */
+    .add-goal-form {
+      background: var(--bg-card); border: 1px solid var(--border);
+      border-radius: 12px; padding: 16px; margin-bottom: 16px;
+    }
+    .kr-add-row { display: flex; gap: 6px; margin-top: 6px; }
+    .kr-list-item {
+      display: flex; align-items: center; gap: 6px;
+      padding: 6px 0; border-bottom: 1px solid var(--border);
+      font-size: 13px;
+    }
+    .kr-list-item:last-child { border-bottom: none; }
+
     /* ===== Misc ===== */
     .empty { text-align: center; padding: 32px 16px; color: var(--text-3); font-size: 14px; }
     .divider { height: 1px; background: var(--border); margin: 20px 0; }
@@ -547,6 +617,9 @@
     <section id="pane-records" class="tab-pane">
       <div id="records-root"><div class="loading">読み込み中...</div></div>
     </section>
+    <section id="pane-goals" class="tab-pane">
+      <div id="goals-root"><div class="loading">読み込み中...</div></div>
+    </section>
   </main>
 
   <nav class="tab-bar">
@@ -561,6 +634,12 @@
         <path d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
       </svg>
       タスク
+    </button>
+    <button class="tab-btn" id="tbtn-goals" onclick="switchTab('goals')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" width="22" height="22">
+        <path d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z"/>
+      </svg>
+      目標
     </button>
     <button class="tab-btn" id="tbtn-records" onclick="switchTab('records')">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" width="22" height="22">
@@ -612,6 +691,13 @@ const S = {
   online:      navigator.onLine,
   queue:       JSON.parse(localStorage.getItem('oq') || '[]'),
   expanded:    new Set(),
+  recMode:     'day',       // 'day' | 'week'
+  weekView:    null,        // 'YYYY-MM-DD' (Monday) | null
+  weekData:    null,
+  goals:       [],
+  showAddGoal: false,
+  editGoalId:  null,
+  newKRs:      [],
 };
 
 // =============================================
@@ -631,6 +717,24 @@ function fmtJP(ds) {
 function esc(s) {
   if (s == null) return '';
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function getWeekStart(dateStr) {
+  const d = new Date(dateStr + 'T00:00:00');
+  const day = d.getDay();
+  const diff = day === 0 ? -6 : 1 - day;
+  d.setDate(d.getDate() + diff);
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+}
+function addDays(dateStr, n) {
+  const d = new Date(dateStr + 'T00:00:00');
+  d.setDate(d.getDate() + n);
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+}
+function fmtWeekRange(ws) {
+  const s = new Date(ws + 'T00:00:00');
+  const e = new Date(ws + 'T00:00:00'); e.setDate(e.getDate()+6);
+  return `${s.getMonth()+1}月${s.getDate()}日（月）〜${e.getMonth()+1}月${e.getDate()}日（日）`;
 }
 
 function catDot(cat) {
@@ -691,10 +795,8 @@ async function checkAuth() {
 async function launchApp() {
   document.getElementById('auth-screen').style.display = 'none';
   document.getElementById('app').hidden = false;
-  await Promise.all([loadToday(), loadTasks(), loadRecordsList()]);
-  renderToday();
-  renderTasks();
-  renderRecords();
+  await Promise.all([loadToday(), loadTasks(), loadRecordsList(), loadGoals()]);
+  renderToday(); renderTasks(); renderRecords(); renderGoals();
 }
 
 // =============================================
@@ -834,6 +936,67 @@ async function saveRecordData(date, rd) {
   const { error } = await sb.from('days').upsert(payload, { onConflict: 'user_id,date' });
   if (error) { toast('エラー: ' + (error.message || JSON.stringify(error)), 5000); console.error(error); }
   else { toast('保存しました ✓'); await loadRecordsList(); if (date === S.today) await loadToday(); }
+}
+
+// =============================================
+// DATA — WEEKS
+// =============================================
+async function loadWeek(ws) {
+  if (S.online && sb) {
+    const { data } = await sb.from('weeks').select('*').eq('user_id', S.user.id).eq('week_start', ws).single();
+    if (data) { S.weekData = data; localStorage.setItem('week_'+ws, JSON.stringify(data)); return; }
+  }
+  const c = localStorage.getItem('week_'+ws);
+  S.weekData = c ? JSON.parse(c) : { week_start: ws, reflection: '', next_goals: '' };
+}
+
+async function saveWeek(ws) {
+  const refl = document.getElementById('week-refl')?.value || S.weekData?.reflection || '';
+  const ng   = document.getElementById('week-next')?.value || S.weekData?.next_goals  || '';
+  const payload = { user_id: S.user.id, week_start: ws, reflection: refl, next_goals: ng, updated_at: new Date().toISOString() };
+  S.weekData = { ...S.weekData, reflection: refl, next_goals: ng };
+  localStorage.setItem('week_'+ws, JSON.stringify(S.weekData));
+  if (!S.online || !sb) { toast('オフライン保存しました'); return; }
+  const { error } = await sb.from('weeks').upsert(payload, { onConflict: 'user_id,week_start' });
+  error ? toast('エラー: ' + error.message, 5000) : toast('保存しました ✓');
+}
+
+// =============================================
+// DATA — GOALS
+// =============================================
+async function loadGoals() {
+  if (S.online && sb) {
+    const { data } = await sb.from('goals').select('*').eq('user_id', S.user.id).eq('archived', false).order('created_at');
+    if (data) { S.goals = data; localStorage.setItem('goals', JSON.stringify(data)); return; }
+  }
+  const c = localStorage.getItem('goals');
+  if (c) S.goals = JSON.parse(c);
+}
+
+async function saveGoal(goal) {
+  const payload = { ...goal, user_id: S.user.id, updated_at: new Date().toISOString() };
+  const exists = S.goals.find(g => g.goal_id === goal.goal_id);
+  if (exists) Object.assign(exists, goal);
+  else S.goals.push({ ...payload });
+  localStorage.setItem('goals', JSON.stringify(S.goals));
+  if (!S.online || !sb) { return; }
+  await sb.from('goals').upsert(payload, { onConflict: 'user_id,goal_id' });
+}
+
+async function deleteGoal(gid) {
+  S.goals = S.goals.filter(g => g.goal_id !== gid);
+  localStorage.setItem('goals', JSON.stringify(S.goals));
+  if (!S.online || !sb) return;
+  await sb.from('goals').delete().eq('user_id', S.user.id).eq('goal_id', gid);
+}
+
+async function updateKR(gid, krs) {
+  const g = S.goals.find(x => x.goal_id === gid);
+  if (!g) return;
+  g.key_results = krs;
+  localStorage.setItem('goals', JSON.stringify(S.goals));
+  if (!S.online || !sb) return;
+  await sb.from('goals').update({ key_results: krs, updated_at: new Date().toISOString() }).eq('user_id', S.user.id).eq('goal_id', gid);
 }
 
 // =============================================
@@ -1268,10 +1431,15 @@ async function doDeleteCompleted() {
 // =============================================
 function renderRecords() {
   const el = document.getElementById('records-root');
+  if (S.recMode === 'week') { renderWeekView(); return; }
   if (S.recView) { renderRecDetail(); return; }
 
   const list = S.records.filter(r => r.date !== S.today);
   el.innerHTML = `
+    <div class="mode-toggle mb-4">
+      <button class="mode-btn active" onclick="setRecMode('day')">日次</button>
+      <button class="mode-btn" onclick="setRecMode('week')">週次</button>
+    </div>
     <div class="sec-header mb-4">
       <div class="sec-title">過去の記録</div>
       <div style="display:flex;gap:6px;align-items:center">
@@ -1394,10 +1562,281 @@ async function doSaveRec() {
 }
 
 function closeRec() {
-  S.recView = null;
-  S.recData = null;
-  showAddRecLog = false;
+  S.recView = null; S.recData = null; showAddRecLog = false; renderRecords();
+}
+
+function setRecMode(mode) {
+  S.recMode = mode;
+  if (mode === 'week' && !S.weekView) S.weekView = getWeekStart(S.today);
   renderRecords();
+}
+
+// =============================================
+// RENDER — WEEK VIEW
+// =============================================
+async function renderWeekView() {
+  const el = document.getElementById('records-root');
+  const ws = S.weekView || getWeekStart(S.today);
+  S.weekView = ws;
+
+  el.innerHTML = `
+    <div class="mode-toggle mb-4">
+      <button class="mode-btn" onclick="setRecMode('day')">日次</button>
+      <button class="mode-btn active" onclick="setRecMode('week')">週次</button>
+    </div>
+    <div class="week-nav">
+      <button class="week-nav-btn" onclick="shiftWeek(-7)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><path d="M15 19l-7-7 7-7"/></svg>
+      </button>
+      <div class="week-label">${fmtWeekRange(ws)}</div>
+      <button class="week-nav-btn" onclick="shiftWeek(7)" ${ws >= getWeekStart(S.today) ? 'disabled style="opacity:0.3"' : ''}>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><path d="M9 5l7 7-7 7"/></svg>
+      </button>
+    </div>
+    <div class="loading">読み込み中...</div>`;
+
+  await loadWeek(ws);
+
+  // 各日の活動を収集
+  const dayNames = ['月','火','水','木','金','土','日'];
+  let daysHTML = '';
+  for (let i = 0; i < 7; i++) {
+    const date = addDays(ws, i);
+    const dayRec = S.records.find(r => r.date === date);
+    const logs = dayRec?.logs || [];
+    if (logs.length === 0) continue;
+    daysHTML += `
+      <div class="week-day">
+        <div class="week-day-head">
+          <div class="week-day-dot"></div>
+          ${dayNames[i]}（${date.slice(5).replace('-','/')}）
+        </div>
+        <div class="card" style="padding:8px 14px">
+          ${logs.map(l => `
+            <div style="padding:6px 0;border-bottom:1px solid var(--border);font-size:14px">
+              ${l.start||l.end ? `<span style="font-size:12px;color:var(--text-3);margin-right:8px">${l.start||''}${l.end?'〜'+l.end:''}</span>` : ''}
+              ${esc(l.title)}
+              ${l.reflection ? `<div style="font-size:12px;color:var(--text-3);margin-top:2px">💭 ${esc(l.reflection)}</div>` : ''}
+            </div>`).join('')}
+        </div>
+      </div>`;
+  }
+
+  // タスクサマリー
+  const weekTasks = S.tasks.filter(t => t.created_date >= ws && t.created_date <= addDays(ws,6));
+  const wDone = weekTasks.filter(t => t.done).length;
+  const wTotal = weekTasks.length;
+  const wRate = wTotal > 0 ? Math.round(wDone/wTotal*100) : 0;
+
+  el.innerHTML = `
+    <div class="mode-toggle mb-4">
+      <button class="mode-btn" onclick="setRecMode('day')">日次</button>
+      <button class="mode-btn active" onclick="setRecMode('week')">週次</button>
+    </div>
+    <div class="week-nav">
+      <button class="week-nav-btn" onclick="shiftWeek(-7)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><path d="M15 19l-7-7 7-7"/></svg>
+      </button>
+      <div class="week-label">${fmtWeekRange(ws)}</div>
+      <button class="week-nav-btn" onclick="shiftWeek(7)" ${ws >= getWeekStart(S.today) ? 'disabled style="opacity:0.3"' : ''}>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><path d="M9 5l7 7-7 7"/></svg>
+      </button>
+    </div>
+
+    <div class="sec-title mb-2">各日の活動</div>
+    ${daysHTML || '<div class="empty" style="padding:16px">この週の活動記録はありません</div>'}
+
+    <div class="divider"></div>
+    <div class="sec-title mb-2">タスクサマリー</div>
+    <div class="stats-grid mb-4">
+      <div class="stat-card"><div class="stat-val">${wDone}</div><div class="stat-lbl">完了</div></div>
+      <div class="stat-card"><div class="stat-val">${wTotal-wDone}</div><div class="stat-lbl">未完了</div></div>
+      <div class="stat-card"><div class="stat-val">${wRate}%</div><div class="stat-lbl">完了率</div></div>
+    </div>
+
+    <div class="divider"></div>
+    <div class="sec-title mb-2">週の振り返り</div>
+    <textarea id="week-refl" placeholder="この週を振り返って..." style="width:100%;min-height:100px" class="mb-4">${esc(S.weekData?.reflection||'')}</textarea>
+
+    <div class="sec-title mb-2">来週の目標・計画</div>
+    <textarea id="week-next" placeholder="来週やること、意識したいこと..." style="width:100%;min-height:80px" class="mb-4">${esc(S.weekData?.next_goals||'')}</textarea>
+
+    <button class="btn btn-primary w-full mb-4" onclick="saveWeek('${ws}')">保存する</button>
+  `;
+}
+
+async function shiftWeek(days) {
+  S.weekView = addDays(S.weekView, days);
+  await renderWeekView();
+}
+
+// =============================================
+// RENDER — GOALS
+// =============================================
+function renderGoals() {
+  const el = document.getElementById('goals-root');
+  const groups = CATS.map(cat => ({ cat, goals: S.goals.filter(g => g.cat === cat) })).filter(g => g.goals.length);
+
+  const goalHTML = groups.length === 0 ? '' : groups.map(g => `
+    <div class="cat-header">${catDot(g.cat)} ${g.cat}</div>
+    ${g.goals.map(goal => renderGoalCard(goal)).join('')}
+  `).join('');
+
+  el.innerHTML = `
+    <div class="sec-header mb-3">
+      <div class="sec-title">長期目標</div>
+      <button class="btn btn-sm btn-secondary" onclick="toggleAddGoal()">${S.showAddGoal ? 'キャンセル' : '＋ 追加'}</button>
+    </div>
+
+    ${S.showAddGoal ? renderAddGoalForm() : ''}
+    ${goalHTML || (!S.showAddGoal ? '<div class="empty">目標を追加してみましょう</div>' : '')}
+  `;
+}
+
+function renderGoalCard(goal) {
+  const krs = goal.key_results || [];
+  const krHTML = krs.length === 0 ? '' : krs.map((kr,i) => {
+    if (kr.is_binary) {
+      return `
+        <div class="kr-item">
+          <div class="kr-binary">
+            <button class="task-check${kr.done?' checked':''}" style="width:18px;height:18px" onclick="toggleKRBinary('${goal.goal_id}',${i})">
+              ${kr.done ? CHECK_SVG_SM : ''}
+            </button>
+            <span class="kr-text" style="${kr.done?'text-decoration:line-through;color:var(--text-3)':''}">${esc(kr.text)}</span>
+            <button class="btn-icon" style="width:24px;height:24px" onclick="deleteKR('${goal.goal_id}',${i})">${TRASH_SVG}</button>
+          </div>
+        </div>`;
+    }
+    const pct = kr.target > 0 ? Math.min(100, Math.round((kr.current||0)/kr.target*100)) : 0;
+    return `
+      <div class="kr-item">
+        <div class="kr-head">
+          <span class="kr-text">${esc(kr.text)}</span>
+          <div style="display:flex;align-items:center;gap:4px">
+            <span class="kr-val">${kr.current||0} / ${kr.target} ${esc(kr.unit||'')}</span>
+            <button class="btn-icon" style="width:24px;height:24px;color:var(--c-research)" onclick="promptKRProgress('${goal.goal_id}',${i})"
+              title="進捗更新">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><path d="M12 4v16m8-8H4"/></svg>
+            </button>
+            <button class="btn-icon" style="width:24px;height:24px" onclick="deleteKR('${goal.goal_id}',${i})">${TRASH_SVG}</button>
+          </div>
+        </div>
+        <div class="progress-bar"><div class="progress-fill" style="width:${pct}%"></div></div>
+      </div>`;
+  }).join('');
+
+  const deadline = goal.deadline ? `期限: ${fmtJP(goal.deadline)}` : '';
+  const totalPct = krs.length > 0 ? Math.round(krs.reduce((acc,kr) => {
+    if (kr.is_binary) return acc + (kr.done ? 100 : 0);
+    return acc + (kr.target > 0 ? Math.min(100, (kr.current||0)/kr.target*100) : 0);
+  }, 0) / krs.length) : 0;
+
+  return `
+    <div class="goal-card">
+      <div class="goal-card-head">
+        <div>
+          <div class="goal-title">${esc(goal.title)}</div>
+          ${deadline ? `<div class="goal-meta">${deadline} · 達成率 ${totalPct}%</div>` : `<div class="goal-meta">達成率 ${totalPct}%</div>`}
+        </div>
+        <div class="goal-actions">
+          <button class="btn-icon" onclick="deleteGoalConfirm('${goal.goal_id}')" style="color:var(--danger)">${TRASH_SVG}</button>
+        </div>
+      </div>
+      ${krHTML}
+      <div class="kr-add-row">
+        <input type="text" id="kr-inp-${goal.goal_id}" placeholder="Key Resultを追加..." style="flex:1;font-size:13px;padding:7px 10px" onkeypress="if(event.key==='Enter')addKRSimple('${goal.goal_id}')">
+        <button class="btn btn-sm btn-secondary" onclick="addKRSimple('${goal.goal_id}')">追加</button>
+      </div>
+    </div>`;
+}
+
+function renderAddGoalForm() {
+  return `
+    <div class="add-goal-form mb-4">
+      <div class="field"><label>目標タイトル <span style="color:var(--danger)">*</span></label>
+        <input type="text" id="goal-title" placeholder="例: 論文を完成させる"></div>
+      <div class="row mb-3">
+        <div><label>カテゴリ</label><select id="goal-cat">${CATS.map(c=>`<option>${c}</option>`).join('')}</select></div>
+        <div><label>期限（任意）</label><input type="date" id="goal-deadline"></div>
+      </div>
+      <div class="form-actions">
+        <button class="btn btn-primary" onclick="submitAddGoal()">追加</button>
+        <button class="btn btn-secondary" onclick="toggleAddGoal()">キャンセル</button>
+      </div>
+    </div>`;
+}
+
+function toggleAddGoal() { S.showAddGoal = !S.showAddGoal; renderGoals(); }
+
+async function submitAddGoal() {
+  const title = document.getElementById('goal-title')?.value.trim();
+  if (!title) { toast('タイトルを入力してください'); return; }
+  const goal = {
+    goal_id: String(Date.now()),
+    title,
+    cat: document.getElementById('goal-cat')?.value || 'その他',
+    deadline: document.getElementById('goal-deadline')?.value || null,
+    key_results: [],
+    archived: false,
+    created_at: new Date().toISOString(),
+  };
+  await saveGoal(goal);
+  S.showAddGoal = false;
+  renderGoals();
+}
+
+async function deleteGoalConfirm(gid) {
+  if (!confirm('この目標を削除しますか？')) return;
+  await deleteGoal(gid);
+  renderGoals();
+}
+
+async function addKRSimple(gid) {
+  const inp = document.getElementById('kr-inp-'+gid);
+  const text = inp?.value.trim();
+  if (!text) return;
+  const g = S.goals.find(x => x.goal_id === gid);
+  if (!g) return;
+  const krs = [...(g.key_results||[])];
+  const isBinary = !text.includes('/');
+  if (isBinary) {
+    krs.push({ text, is_binary: true, done: false });
+  } else {
+    const parts = text.split('/');
+    krs.push({ text: parts[0].trim(), is_binary: false, target: Number(parts[1])||1, current: 0, unit: parts[2]?.trim()||'' });
+  }
+  await updateKR(gid, krs);
+  renderGoals();
+}
+
+async function toggleKRBinary(gid, idx) {
+  const g = S.goals.find(x => x.goal_id === gid);
+  if (!g) return;
+  const krs = [...(g.key_results||[])];
+  krs[idx] = { ...krs[idx], done: !krs[idx].done };
+  await updateKR(gid, krs);
+  renderGoals();
+}
+
+async function promptKRProgress(gid, idx) {
+  const g = S.goals.find(x => x.goal_id === gid);
+  if (!g) return;
+  const kr = g.key_results[idx];
+  const val = prompt(`現在の進捗を入力（${kr.unit||''}）\n目標: ${kr.target}`, kr.current||0);
+  if (val === null) return;
+  const krs = [...(g.key_results||[])];
+  krs[idx] = { ...krs[idx], current: Number(val)||0 };
+  await updateKR(gid, krs);
+  renderGoals();
+}
+
+async function deleteKR(gid, idx) {
+  const g = S.goals.find(x => x.goal_id === gid);
+  if (!g) return;
+  const krs = (g.key_results||[]).filter((_,i) => i !== idx);
+  await updateKR(gid, krs);
+  renderGoals();
 }
 
 // =============================================
@@ -1409,7 +1848,7 @@ function switchTab(tab) {
   document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
   document.getElementById(`pane-${tab}`).classList.add('active');
   document.getElementById(`tbtn-${tab}`).classList.add('active');
-  const labels = { today:'今日', tasks:'タスク', records:'記録' };
+  const labels = { today:'今日', tasks:'タスク', goals:'目標', records:'記録' };
   document.getElementById('head-title').textContent = labels[tab];
 }
 
@@ -1422,8 +1861,8 @@ function setupOffline() {
     document.getElementById('offline-bar').classList.remove('show');
     await flushQueue();
     if (S.user) {
-      await Promise.all([loadToday(), loadTasks(), loadRecordsList()]);
-      renderToday(); renderTasks(); renderRecords();
+      await Promise.all([loadToday(), loadTasks(), loadRecordsList(), loadGoals()]);
+      renderToday(); renderTasks(); renderRecords(); renderGoals();
     }
   });
   window.addEventListener('offline', () => {
