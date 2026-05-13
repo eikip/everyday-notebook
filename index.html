@@ -298,6 +298,46 @@
     }
     .task-check.checked { background: var(--success); border-color: var(--success); }
 
+    /* ===== Deferred badge ===== */
+    .defer-tag {
+      font-size: 11px; padding: 2px 8px; border-radius: 10px;
+      font-weight: 500; cursor: pointer; flex-shrink: 0;
+      border: none; font-family: inherit;
+      -webkit-tap-highlight-color: transparent;
+      transition: all 0.15s;
+    }
+    .defer-tag.today-tag { background: #e6f4ee; color: #1D9E75; }
+    .defer-tag.later-tag { background: var(--bg-input); color: var(--text-3); }
+    @media (prefers-color-scheme: dark) {
+      .defer-tag.today-tag { background: #0d2e1f; color: #1D9E75; }
+    }
+
+    /* ===== Subtasks ===== */
+    .task-wrap { display: flex; flex-direction: column; }
+    .task-row  { display: flex; align-items: center; gap: 10px; padding: 11px 16px; border-bottom: 1px solid var(--border); }
+    .task-row:last-child { border-bottom: none; }
+    .subtask-list { padding: 4px 16px 8px 38px; border-bottom: 1px solid var(--border); }
+    .subtask-list:last-child { border-bottom: none; }
+    .subtask-item { display: flex; align-items: center; gap: 8px; padding: 5px 0; }
+    .subtask-check {
+      width: 16px; height: 16px; border: 1.5px solid var(--border);
+      border-radius: 3px; cursor: pointer; flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center;
+      background: transparent; -webkit-tap-highlight-color: transparent;
+    }
+    .subtask-check.checked { background: var(--success); border-color: var(--success); }
+    .subtask-text { font-size: 13px; flex: 1; }
+    .subtask-text.done { text-decoration: line-through; color: var(--text-3); }
+    .add-sub-row { display: flex; gap: 6px; margin-top: 6px; }
+    .add-sub-row input { flex: 1; font-size: 13px; padding: 7px 10px; }
+    .expand-btn {
+      background: none; border: none; cursor: pointer;
+      color: var(--text-3); padding: 2px; display: flex; align-items: center;
+      -webkit-tap-highlight-color: transparent; flex-shrink: 0;
+      transition: transform 0.15s;
+    }
+    .expand-btn.open { transform: rotate(180deg); }
+
     /* ===== Stats ===== */
     .stats-grid {
       display: grid;
@@ -553,6 +593,7 @@ const S = {
   recData:     null,
   online:      navigator.onLine,
   queue:       JSON.parse(localStorage.getItem('oq') || '[]'),
+  expanded:    new Set(),
 };
 
 // =============================================
@@ -687,7 +728,7 @@ async function loadTasks() {
 
 async function addTask(text, cat) {
   const tid = String(Date.now()) + Math.random().toString(36).slice(2,6);
-  const task = { user_id: S.user.id, task_id: tid, text, cat, done: false, created_date: S.today, created_at: new Date().toISOString() };
+  const task = { user_id: S.user.id, task_id: tid, text, cat, done: false, deferred: false, subtasks: [], created_date: S.today, created_at: new Date().toISOString() };
   S.tasks.unshift(task);
   S.todayData.task_ids = [...(S.todayData.task_ids||[]), tid];
   localStorage.setItem('tasks', JSON.stringify(S.tasks));
@@ -704,6 +745,15 @@ async function toggleTask(tid) {
   localStorage.setItem('tasks', JSON.stringify(S.tasks));
   if (!S.online || !sb) { enqueue('toggle_task', { tid, done: t.done, uid: S.user.id }); return; }
   await sb.from('tasks').update({ done: t.done }).eq('user_id', S.user.id).eq('task_id', tid);
+}
+
+async function updateTaskFields(tid, updates) {
+  const t = S.tasks.find(x => x.task_id === tid);
+  if (!t) return;
+  Object.assign(t, updates);
+  localStorage.setItem('tasks', JSON.stringify(S.tasks));
+  if (!S.online || !sb) { enqueue('update_task_fields', { tid, updates, uid: S.user.id }); return; }
+  await sb.from('tasks').update(updates).eq('user_id', S.user.id).eq('task_id', tid);
 }
 
 async function deleteTask(tid) {
@@ -786,6 +836,7 @@ async function flushQueue() {
       if (item.action === 'day') await sb.from('days').upsert(item.data, { onConflict: 'user_id,date' });
       else if (item.action === 'insert_task') await sb.from('tasks').insert(item.data);
       else if (item.action === 'toggle_task') await sb.from('tasks').update({ done: item.data.done }).eq('user_id', item.data.uid).eq('task_id', item.data.tid);
+      else if (item.action === 'update_task_fields') await sb.from('tasks').update(item.data.updates).eq('user_id', item.data.uid).eq('task_id', item.data.tid);
       else if (item.action === 'delete_task') await sb.from('tasks').delete().eq('user_id', item.data.uid).eq('task_id', item.data.tid);
       else if (item.action === 'delete_completed') await sb.from('tasks').delete().eq('user_id', item.data.uid).in('task_id', item.data.ids);
     } catch(e) { S.queue.push(item); }
@@ -838,9 +889,17 @@ function renderToday() {
       <button class="btn btn-secondary w-full" onclick="doAddTodayTask()">追加</button>
     </div>
     <div id="today-tasks-list">
-      ${todayTasks.length === 0
-        ? '<div class="empty" style="padding:16px">今日追加したタスクはありません</div>'
-        : `<div class="card">${todayTasks.map(t => taskItem(t,'today')).join('')}</div>`}
+      ${(() => {
+        if (todayTasks.length === 0) return '<div class="empty" style="padding:16px">今日追加したタスクはありません</div>';
+        const doToday  = todayTasks.filter(t => !t.deferred && !t.done);
+        const doLater  = todayTasks.filter(t =>  t.deferred && !t.done);
+        const doDone   = todayTasks.filter(t => t.done);
+        let html = '';
+        if (doToday.length)  html += `<div class="sec-title mb-2" style="color:var(--c-research)">今日やる</div><div class="card mb-3">${doToday.map(t=>taskItem(t,'today')).join('')}</div>`;
+        if (doLater.length)  html += `<div class="sec-title mb-2">後で</div><div class="card mb-3">${doLater.map(t=>taskItem(t,'today')).join('')}</div>`;
+        if (doDone.length)   html += `<div class="sec-title mb-2">完了済み</div><div class="card mb-3">${doDone.map(t=>taskItem(t,'today')).join('')}</div>`;
+        return html || '<div class="empty" style="padding:16px">タスクはありません</div>';
+      })()}
     </div>
 
     <div class="mt-4 mb-4">
@@ -972,17 +1031,45 @@ function deleteLog(i, ctx) {
 }
 
 // ===== Task item =====
+const CHECK_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" width="11" height="11"><path d="M4.5 12.75l6 6 9-13.5"/></svg>';
+const CHECK_SVG_SM = '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" width="9" height="9"><path d="M4.5 12.75l6 6 9-13.5"/></svg>';
+const TRASH_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><path d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0"/></svg>';
+const CHEV_SVG  = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><path d="M19 9l-7 7-7-7"/></svg>';
+
 function taskItem(t, ctx) {
+  const subs = t.subtasks || [];
+  const isOpen = S.expanded.has(t.task_id);
+  const deferred = !!t.deferred;
+
+  const subHTML = isOpen ? `
+    <div class="subtask-list">
+      ${subs.map((s,i) => `
+        <div class="subtask-item">
+          <button class="subtask-check${s.done?' checked':''}" onclick="doToggleSubtask('${t.task_id}',${i},'${ctx}')">
+            ${s.done ? CHECK_SVG_SM : ''}
+          </button>
+          <span class="subtask-text${s.done?' done':''}">${esc(s.text)}</span>
+          <button class="btn-icon" style="width:24px;height:24px" onclick="doDeleteSubtask('${t.task_id}',${i},'${ctx}')">${TRASH_SVG}</button>
+        </div>`).join('')}
+      <div class="add-sub-row">
+        <input type="text" id="sub-inp-${t.task_id}" placeholder="サブタスクを追加..." onkeypress="if(event.key==='Enter')doAddSubtask('${t.task_id}','${ctx}')">
+        <button class="btn btn-sm btn-secondary" onclick="doAddSubtask('${t.task_id}','${ctx}')">追加</button>
+      </div>
+    </div>` : '';
+
   return `
-    <div class="task-item" id="ti-${t.task_id}">
-      <div class="task-dot" style="background:${CAT_COLOR[t.cat]||'#888780'}"></div>
-      <div class="task-text${t.done?' done':''}">${esc(t.text)}</div>
-      <button class="task-check${t.done?' checked':''}" onclick="doToggleTask('${t.task_id}','${ctx}')">
-        ${t.done ? '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" width="11" height="11"><path d="M4.5 12.75l6 6 9-13.5"/></svg>' : ''}
-      </button>
-      <button class="btn-icon" onclick="doDeleteTask('${t.task_id}','${ctx}')">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" width="15" height="15"><path d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0"/></svg>
-      </button>
+    <div class="task-wrap" id="ti-${t.task_id}">
+      <div class="task-row">
+        <div class="task-dot" style="background:${CAT_COLOR[t.cat]||'#888780'}"></div>
+        <div class="task-text${t.done?' done':''}" style="flex:1">${esc(t.text)}</div>
+        <button class="defer-tag ${deferred?'later-tag':'today-tag'}" onclick="doToggleDeferred('${t.task_id}','${ctx}')">${deferred?'後で':'今日'}</button>
+        <button class="expand-btn${isOpen?' open':''}" onclick="doToggleExpand('${t.task_id}','${ctx}')">${CHEV_SVG}</button>
+        <button class="task-check${t.done?' checked':''}" onclick="doToggleTask('${t.task_id}','${ctx}')">
+          ${t.done ? CHECK_SVG : ''}
+        </button>
+        <button class="btn-icon" onclick="doDeleteTask('${t.task_id}','${ctx}')">${TRASH_SVG}</button>
+      </div>
+      ${subHTML}
     </div>`;
 }
 
@@ -999,6 +1086,50 @@ async function doAddTodayTask() {
 
 async function doToggleTask(tid, ctx) {
   await toggleTask(tid);
+  if (ctx === 'today') renderToday(); else renderTasks();
+}
+
+async function doToggleDeferred(tid, ctx) {
+  const t = S.tasks.find(x => x.task_id === tid);
+  if (!t) return;
+  await updateTaskFields(tid, { deferred: !t.deferred });
+  if (ctx === 'today') renderToday(); else renderTasks();
+}
+
+function doToggleExpand(tid, ctx) {
+  if (S.expanded.has(tid)) S.expanded.delete(tid); else S.expanded.add(tid);
+  if (ctx === 'today') renderToday(); else renderTasks();
+}
+
+async function doAddSubtask(tid, ctx) {
+  const inp = document.getElementById('sub-inp-' + tid);
+  if (!inp) return;
+  const text = inp.value.trim();
+  if (!text) return;
+  const t = S.tasks.find(x => x.task_id === tid);
+  if (!t) return;
+  const subs = [...(t.subtasks || []), { id: Date.now(), text, done: false }];
+  await updateTaskFields(tid, { subtasks: subs });
+  S.expanded.add(tid);
+  if (ctx === 'today') renderToday(); else renderTasks();
+}
+
+async function doToggleSubtask(tid, idx, ctx) {
+  const t = S.tasks.find(x => x.task_id === tid);
+  if (!t) return;
+  const subs = [...(t.subtasks || [])];
+  subs[idx] = { ...subs[idx], done: !subs[idx].done };
+  await updateTaskFields(tid, { subtasks: subs });
+  S.expanded.add(tid);
+  if (ctx === 'today') renderToday(); else renderTasks();
+}
+
+async function doDeleteSubtask(tid, idx, ctx) {
+  const t = S.tasks.find(x => x.task_id === tid);
+  if (!t) return;
+  const subs = (t.subtasks || []).filter((_,i) => i !== idx);
+  await updateTaskFields(tid, { subtasks: subs });
+  S.expanded.add(tid);
   if (ctx === 'today') renderToday(); else renderTasks();
 }
 
@@ -1021,7 +1152,13 @@ function renderTasks() {
   const f = S.taskFilter;
 
   let listHTML = '';
-  if (f === 'all') {
+  if (f === 'today-only') {
+    const ts = S.tasks.filter(t => !t.deferred && !t.done);
+    listHTML = ts.length ? `<div class="card mb-3">${ts.map(t=>taskItem(t,'tasks')).join('')}</div>` : '<div class="empty">今日やるタスクはありません</div>';
+  } else if (f === 'later') {
+    const ts = S.tasks.filter(t => t.deferred && !t.done);
+    listHTML = ts.length ? `<div class="card mb-3">${ts.map(t=>taskItem(t,'tasks')).join('')}</div>` : '<div class="empty">後でやるタスクはありません</div>';
+  } else if (f === 'all') {
     const groups = CATS.map(cat => ({ cat, tasks: S.tasks.filter(t => t.cat === cat && !t.done) })).filter(g => g.tasks.length);
     if (!groups.length) listHTML = '<div class="empty">未完了のタスクはありません 🎉</div>';
     else listHTML = groups.map(g => `
@@ -1044,7 +1181,7 @@ function renderTasks() {
     </div>
 
     <div class="filter-pills">
-      ${[['all','すべて'],['研究','研究'],['授業','授業'],['プライベート','プライベート'],['その他','その他'],['done','完了済み']]
+      ${[['today-only','今日'],['later','後で'],['all','すべて'],['研究','研究'],['授業','授業'],['プライベート','プライベート'],['その他','その他'],['done','完了済み']]
         .map(([v,lbl]) => `<button class="pill${f===v?' active':''}" onclick="setFilter('${v}')">${lbl}</button>`).join('')}
     </div>
 
