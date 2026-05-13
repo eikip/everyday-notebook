@@ -268,9 +268,10 @@
       align-items: end;
       margin-bottom: 12px;
     }
-    .time-row { display: flex; flex-direction: column; gap: 10px; margin-bottom: 12px; }
-    .time-row-item { display: flex; align-items: center; gap: 10px; }
-    .time-row-item > label { width: 32px; flex-shrink: 0; margin: 0; line-height: 1; }
+    .time-row { display: flex; align-items: flex-end; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
+    .time-row-item { display: flex; flex-direction: column; gap: 4px; }
+    .time-row-item > label { margin: 0; }
+    .time-row-sep { color: var(--text-3); font-size: 16px; padding-bottom: 90px; flex-shrink: 0; }
     .drum-picker-wrap { display: flex; align-items: center; gap: 4px; }
     .drum-col {
       position: relative; width: 52px;
@@ -1135,9 +1136,24 @@ function renderToday() {
 const DRUM_H = 36;
 const H_VALS = Array.from({length: 24}, (_, i) => pad(i));
 const M_VALS = ['00','05','10','15','20','25','30','35','40','45','50','55'];
+const DRUM_REPEAT = 5;
 
 function defaultHour() {
   return `${pad(new Date().getHours())}:00`;
+}
+function _drumCol(id, part, vals, initIdx) {
+  const n = vals.length;
+  const globalIdx = n * 2 + initIdx; // active in repeated list (start at 2nd set)
+  const pads = `<div class="drum-item drum-pad"></div>`.repeat(2);
+  const repeated = Array(DRUM_REPEAT).fill(vals).flat();
+  const items = repeated.map((v, i) => `<div class="drum-item${i === globalIdx ? ' active' : ''}">${v}</div>`).join('');
+  return `
+    <div class="drum-col">
+      <div class="drum-fade top"></div>
+      <div class="drum-fade bot"></div>
+      <div class="drum-sel-bar"></div>
+      <div class="drum-scroll" id="${id}-${part}-scroll" data-n="${n}" onscroll="onDrumScroll('${id}','${part}')">${pads}${items}${pads}</div>
+    </div>`;
 }
 function timePicker(id, initVal) {
   let hIdx = new Date().getHours(), mIdx = 0;
@@ -1146,25 +1162,11 @@ function timePicker(id, initVal) {
     hIdx = parseInt(hh, 10) || 0;
     mIdx = Math.round((parseInt(mm, 10) || 0) / 5) % M_VALS.length;
   }
-  const PADDING = 2;
-  const pads = `<div class="drum-item drum-pad"></div>`.repeat(PADDING);
-  const hItems = H_VALS.map((v, i) => `<div class="drum-item${i === hIdx ? ' active' : ''}">${v}</div>`).join('');
-  const mItems = M_VALS.map((v, i) => `<div class="drum-item${i === mIdx ? ' active' : ''}">${v}</div>`).join('');
   return `
     <div class="drum-picker-wrap">
-      <div class="drum-col">
-        <div class="drum-fade top"></div>
-        <div class="drum-fade bot"></div>
-        <div class="drum-sel-bar"></div>
-        <div class="drum-scroll" id="${id}-h-scroll" onscroll="onDrumScroll('${id}','h')">${pads}${hItems}${pads}</div>
-      </div>
+      ${_drumCol(id, 'h', H_VALS, hIdx)}
       <span class="drum-colon">:</span>
-      <div class="drum-col">
-        <div class="drum-fade top"></div>
-        <div class="drum-fade bot"></div>
-        <div class="drum-sel-bar"></div>
-        <div class="drum-scroll" id="${id}-m-scroll" onscroll="onDrumScroll('${id}','m')">${pads}${mItems}${pads}</div>
-      </div>
+      ${_drumCol(id, 'm', M_VALS, mIdx)}
       <input type="hidden" id="${id}" value="${H_VALS[hIdx]}:${M_VALS[mIdx]}">
       <button class="now-btn" onclick="setNow('${id}')">今</button>
     </div>`;
@@ -1176,10 +1178,14 @@ function onDrumScroll(id, part) {
   _drumT[key] = setTimeout(() => {
     const el = document.getElementById(`${id}-${part}-scroll`);
     if (!el) return;
-    const vals = part === 'h' ? H_VALS : M_VALS;
-    const idx = Math.min(Math.max(Math.round(el.scrollTop / DRUM_H), 0), vals.length - 1);
-    el.scrollTop = idx * DRUM_H;
-    el.querySelectorAll('.drum-item:not(.drum-pad)').forEach((item, i) => item.classList.toggle('active', i === idx));
+    const n = parseInt(el.dataset.n, 10);
+    const absIdx = Math.round(el.scrollTop / DRUM_H);
+    const realIdx = ((absIdx % n) + n) % n;
+    // silently loop when near edges
+    if (absIdx < n || absIdx >= n * (DRUM_REPEAT - 1)) {
+      el.scrollTop = (n * 2 + realIdx) * DRUM_H;
+    }
+    el.querySelectorAll('.drum-item:not(.drum-pad)').forEach((item, i) => item.classList.toggle('active', i % n === realIdx));
     _updateDrumHidden(id);
   }, 150);
 }
@@ -1188,16 +1194,18 @@ function _updateDrumHidden(id) {
   const mEl = document.getElementById(`${id}-m-scroll`);
   const hidden = document.getElementById(id);
   if (!hEl || !mEl || !hidden) return;
-  const hIdx = Math.min(Math.max(Math.round(hEl.scrollTop / DRUM_H), 0), 23);
-  const mIdx = Math.min(Math.max(Math.round(mEl.scrollTop / DRUM_H), 0), M_VALS.length - 1);
+  const hN = parseInt(hEl.dataset.n, 10);
+  const mN = parseInt(mEl.dataset.n, 10);
+  const hIdx = ((Math.round(hEl.scrollTop / DRUM_H) % hN) + hN) % hN;
+  const mIdx = ((Math.round(mEl.scrollTop / DRUM_H) % mN) + mN) % mN;
   hidden.value = `${H_VALS[hIdx]}:${M_VALS[mIdx]}`;
 }
 function initAllDrums() {
   document.querySelectorAll('.drum-scroll').forEach(el => {
     const items = el.querySelectorAll('.drum-item:not(.drum-pad)');
-    let activeIdx = 0;
-    items.forEach((item, i) => { if (item.classList.contains('active')) activeIdx = i; });
-    el.scrollTop = activeIdx * DRUM_H;
+    let activeGlobal = 0;
+    items.forEach((item, i) => { if (item.classList.contains('active')) activeGlobal = i; });
+    el.scrollTop = activeGlobal * DRUM_H;
   });
 }
 function setNow(id) {
@@ -1206,8 +1214,9 @@ function setNow(id) {
   const mIdx = Math.round(now.getMinutes() / 5) % M_VALS.length;
   const hEl = document.getElementById(`${id}-h-scroll`);
   const mEl = document.getElementById(`${id}-m-scroll`);
-  if (hEl) { hEl.scrollTo({top: hIdx * DRUM_H, behavior: 'smooth'}); hEl.querySelectorAll('.drum-item:not(.drum-pad)').forEach((item,i)=>item.classList.toggle('active',i===hIdx)); }
-  if (mEl) { mEl.scrollTo({top: mIdx * DRUM_H, behavior: 'smooth'}); mEl.querySelectorAll('.drum-item:not(.drum-pad)').forEach((item,i)=>item.classList.toggle('active',i===mIdx)); }
+  const hN = H_VALS.length, mN = M_VALS.length;
+  if (hEl) { hEl.scrollTo({top: (hN*2+hIdx)*DRUM_H, behavior:'smooth'}); hEl.querySelectorAll('.drum-item:not(.drum-pad)').forEach((item,i)=>item.classList.toggle('active',i%hN===hIdx)); }
+  if (mEl) { mEl.scrollTo({top: (mN*2+mIdx)*DRUM_H, behavior:'smooth'}); mEl.querySelectorAll('.drum-item:not(.drum-pad)').forEach((item,i)=>item.classList.toggle('active',i%mN===mIdx)); }
   const hidden = document.getElementById(id);
   if (hidden) hidden.value = `${H_VALS[hIdx]}:${M_VALS[mIdx]}`;
 }
@@ -1230,6 +1239,7 @@ function logForm(log, idx, ctx) {
           <label>開始</label>
           ${timePicker(pfx+'-start', l.start)}
         </div>
+        <span class="time-row-sep">〜</span>
         <div class="time-row-item">
           <label>終了</label>
           ${timePicker(pfx+'-end', l.end)}
