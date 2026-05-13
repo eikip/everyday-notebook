@@ -272,7 +272,17 @@
     .time-row-item { display: flex; flex-direction: column; gap: 4px; }
     .time-row-item > label { margin: 0; }
     .time-row-sep { color: var(--text-3); font-size: 16px; padding-bottom: 90px; flex-shrink: 0; }
-    .drum-picker-wrap { display: flex; align-items: center; gap: 4px; }
+    .drum-picker-wrap { display: flex; align-items: center; gap: 6px; }
+    .drum-display {
+      font-size: 18px; font-weight: 700; font-variant-numeric: tabular-nums;
+      background: var(--bg-input); border: none; border-radius: 8px;
+      padding: 6px 12px; color: var(--text-1);
+      cursor: pointer; font-family: inherit;
+      -webkit-tap-highlight-color: transparent;
+      transition: opacity .1s;
+    }
+    .drum-display:active { opacity: 0.6; }
+    .drum-open { display: none; align-items: center; gap: 4px; }
     .drum-col {
       position: relative; width: 52px;
       height: 180px; overflow: hidden;
@@ -1162,13 +1172,17 @@ function timePicker(id, initVal) {
     hIdx = parseInt(hh, 10) || 0;
     mIdx = Math.round((parseInt(mm, 10) || 0) / 5) % M_VALS.length;
   }
+  const initTime = `${H_VALS[hIdx]}:${M_VALS[mIdx]}`;
   return `
     <div class="drum-picker-wrap">
-      ${_drumCol(id, 'h', H_VALS, hIdx)}
-      <span class="drum-colon">:</span>
-      ${_drumCol(id, 'm', M_VALS, mIdx)}
-      <input type="hidden" id="${id}" value="${H_VALS[hIdx]}:${M_VALS[mIdx]}">
-      <button class="now-btn" onclick="setNow('${id}')">今</button>
+      <button class="drum-display" id="${id}-display" onclick="toggleDrum('${id}')">${initTime}</button>
+      <div class="drum-open" id="${id}-open">
+        ${_drumCol(id, 'h', H_VALS, hIdx)}
+        <span class="drum-colon">:</span>
+        ${_drumCol(id, 'm', M_VALS, mIdx)}
+        <button class="now-btn" onclick="setNow('${id}')">今</button>
+      </div>
+      <input type="hidden" id="${id}" value="${initTime}">
     </div>`;
 }
 const _drumT = {};
@@ -1200,13 +1214,30 @@ function _updateDrumHidden(id) {
   const mIdx = ((Math.round(mEl.scrollTop / DRUM_H) % mN) + mN) % mN;
   hidden.value = `${H_VALS[hIdx]}:${M_VALS[mIdx]}`;
 }
+function _initDrumEl(el) {
+  const items = el.querySelectorAll('.drum-item:not(.drum-pad)');
+  let activeGlobal = 0;
+  items.forEach((item, i) => { if (item.classList.contains('active')) activeGlobal = i; });
+  el.scrollTop = activeGlobal * DRUM_H;
+}
 function initAllDrums() {
   document.querySelectorAll('.drum-scroll').forEach(el => {
-    const items = el.querySelectorAll('.drum-item:not(.drum-pad)');
-    let activeGlobal = 0;
-    items.forEach((item, i) => { if (item.classList.contains('active')) activeGlobal = i; });
-    el.scrollTop = activeGlobal * DRUM_H;
+    if (el.closest('.drum-open')?.style.display === 'flex') _initDrumEl(el);
   });
+}
+function toggleDrum(id) {
+  const openEl = document.getElementById(`${id}-open`);
+  const dispEl = document.getElementById(`${id}-display`);
+  if (!openEl) return;
+  const isOpen = openEl.style.display === 'flex';
+  if (isOpen) {
+    openEl.style.display = 'none';
+    const hidden = document.getElementById(id);
+    if (dispEl && hidden) dispEl.textContent = hidden.value;
+  } else {
+    openEl.style.display = 'flex';
+    requestAnimationFrame(() => openEl.querySelectorAll('.drum-scroll').forEach(_initDrumEl));
+  }
 }
 function setNow(id) {
   const now = new Date();
