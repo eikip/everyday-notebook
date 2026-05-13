@@ -1,4 +1,4 @@
-const CACHE = 'furikaeri-v8';
+const CACHE = 'furikaeri-v9';
 const PRECACHE = [
   './',
   './index.html',
