@@ -269,6 +269,24 @@
       margin-bottom: 12px;
     }
     .time-sep { text-align: center; color: var(--text-3); font-size: 14px; padding-bottom: 10px; }
+    .time-input-wrap { display: flex; gap: 4px; align-items: center; }
+    .time-input-wrap input { flex: 1; }
+    .now-btn {
+      flex-shrink: 0;
+      padding: 0 8px;
+      height: 40px;
+      border-radius: 8px;
+      font-size: 12px;
+      font-weight: 600;
+      background: var(--bg-input);
+      color: var(--text-2);
+      border: none;
+      cursor: pointer;
+      font-family: inherit;
+      white-space: nowrap;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .now-btn:active { opacity: 0.7; }
     .form-actions { display: flex; gap: 8px; margin-top: 12px; }
 
     /* ===== Tasks ===== */
@@ -916,9 +934,19 @@ function renderToday() {
 }
 
 // ===== Log form =====
+function defaultHour() {
+  const now = new Date();
+  return `${pad(now.getHours())}:00`;
+}
+function setNow(id) {
+  const now = new Date();
+  const el = document.getElementById(id);
+  if (el) el.value = `${pad(now.getHours())}:${pad(now.getMinutes())}`;
+}
+
 function logForm(log, idx, ctx) {
-  const l = log || { start:'', end:'', title:'', body:'', reflection:'', comment:'' };
   const isEdit = idx !== null;
+  const l = log || { start: isEdit ? '' : defaultHour(), end:'', title:'', body:'', reflection:'', comment:'' };
   const saveF = ctx === 'today'
     ? (isEdit ? `saveTodayLogEdit(${idx})` : 'submitTodayLog()')
     : (isEdit ? `saveRecLogEdit(${idx})`   : 'submitRecLog()');
@@ -930,9 +958,21 @@ function logForm(log, idx, ctx) {
   return `
     <div class="add-form ${isEdit?'':'mb-3'}">
       <div class="time-row">
-        <div><label>開始</label><input type="time" id="${pfx}-start" value="${esc(l.start)}"></div>
+        <div>
+          <label>開始</label>
+          <div class="time-input-wrap">
+            <input type="time" id="${pfx}-start" value="${esc(l.start)}">
+            <button class="now-btn" onclick="setNow('${pfx}-start')">今</button>
+          </div>
+        </div>
         <div class="time-sep">〜</div>
-        <div><label>終了</label><input type="time" id="${pfx}-end" value="${esc(l.end)}"></div>
+        <div>
+          <label>終了</label>
+          <div class="time-input-wrap">
+            <input type="time" id="${pfx}-end" value="${esc(l.end)}">
+            <button class="now-btn" onclick="setNow('${pfx}-end')">今</button>
+          </div>
+        </div>
       </div>
       <div class="field">
         <label>タイトル <span style="color:var(--danger)">*</span></label>
@@ -1234,7 +1274,10 @@ function renderRecords() {
   el.innerHTML = `
     <div class="sec-header mb-4">
       <div class="sec-title">過去の記録</div>
-      <input type="date" id="rec-picker" style="width:auto;padding:6px 10px;font-size:13px" onchange="openRec(this.value)">
+      <div style="display:flex;gap:6px;align-items:center">
+        <input type="date" id="rec-picker" style="width:auto;padding:6px 10px;font-size:13px" onchange="openRecFromPicker()">
+        <button class="btn btn-sm btn-secondary" onclick="openRecFromPicker()">開く</button>
+      </div>
     </div>
     ${list.length === 0
       ? '<div class="empty">まだ過去の記録がありません</div>'
@@ -1247,6 +1290,11 @@ function renderRecords() {
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" width="16" height="16" style="color:var(--text-3)"><path d="M8.25 4.5l7.5 7.5-7.5 7.5"/></svg>
         </div>`).join('')}
   `;
+}
+
+function openRecFromPicker() {
+  const v = document.getElementById('rec-picker')?.value;
+  if (v) openRec(v);
 }
 
 async function openRec(date) {
