@@ -660,7 +660,7 @@ async function saveToday() {
   localStorage.setItem('day_'+S.today, JSON.stringify(S.todayData));
   if (!S.online || !sb) { enqueue('day', mkDayPayload(S.todayData)); toast('オフライン保存しました'); return; }
   const { error } = await sb.from('days').upsert(mkDayPayload(S.todayData), { onConflict: 'user_id,date' });
-  if (error) { toast('保存に失敗しました'); console.error(error); }
+  if (error) { toast('エラー: ' + (error.message || JSON.stringify(error)), 5000); console.error(error); }
   else { toast('保存しました ✓'); await loadRecordsList(); }
 }
 
@@ -764,7 +764,7 @@ async function saveRecordData(date, rd) {
   localStorage.setItem('day_'+date, JSON.stringify({ date, logs: rd.logs, reflection: rd.reflection, task_ids: rd.task_ids||[] }));
   if (!S.online || !sb) { enqueue('day', payload); toast('オフライン保存しました'); return; }
   const { error } = await sb.from('days').upsert(payload, { onConflict: 'user_id,date' });
-  if (error) { toast('保存に失敗しました'); console.error(error); }
+  if (error) { toast('エラー: ' + (error.message || JSON.stringify(error)), 5000); console.error(error); }
   else { toast('保存しました ✓'); await loadRecordsList(); if (date === S.today) await loadToday(); }
 }
 
