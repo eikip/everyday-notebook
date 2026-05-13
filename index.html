@@ -1,0 +1,1277 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <title>振り返り</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="apple-touch-icon" href="icon.png">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+  <style>
+    /* ===== Variables ===== */
+    :root {
+      --bg:        #f7f7f5;
+      --bg-card:   #ffffff;
+      --bg-input:  #f0f0ee;
+      --text:      #1a1a1a;
+      --text-2:    #555555;
+      --text-3:    #999999;
+      --border:    #e8e8e4;
+      --danger:    #cc3333;
+      --success:   #1D9E75;
+      --c-research:  #1D9E75;
+      --c-class:     #534AB7;
+      --c-private:   #993556;
+      --c-other:     #888780;
+      --tab-h: 60px;
+      --head-h: 52px;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg:       #111111;
+        --bg-card:  #1c1c1e;
+        --bg-input: #2c2c2e;
+        --text:     #f0f0f0;
+        --text-2:   #aaaaaa;
+        --text-3:   #666666;
+        --border:   #2c2c2e;
+      }
+    }
+
+    /* ===== Reset ===== */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { -webkit-text-size-adjust: 100%; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.5;
+      min-height: 100dvh;
+    }
+
+    /* ===== Auth ===== */
+    #auth-screen {
+      min-height: 100dvh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+    .auth-box { width: 100%; max-width: 360px; }
+    .auth-logo {
+      font-size: 28px;
+      font-weight: 700;
+      margin-bottom: 6px;
+      letter-spacing: -0.5px;
+    }
+    .auth-sub { font-size: 14px; color: var(--text-3); margin-bottom: 32px; }
+
+    /* ===== App shell ===== */
+    #app { display: flex; flex-direction: column; height: 100dvh; }
+    header {
+      height: var(--head-h);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 16px;
+      background: var(--bg);
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      flex-shrink: 0;
+    }
+    .head-title { font-size: 17px; font-weight: 600; }
+    main {
+      flex: 1;
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+      padding-bottom: calc(var(--tab-h) + env(safe-area-inset-bottom, 0px) + 8px);
+    }
+    .tab-pane {
+      display: none;
+      padding: 16px;
+      max-width: 680px;
+      margin: 0 auto;
+    }
+    .tab-pane.active { display: block; }
+
+    /* ===== Tab bar ===== */
+    .tab-bar {
+      height: calc(var(--tab-h) + env(safe-area-inset-bottom, 0px));
+      padding-bottom: env(safe-area-inset-bottom, 0px);
+      border-top: 1px solid var(--border);
+      display: flex;
+      background: var(--bg);
+      position: fixed;
+      bottom: 0; left: 0; right: 0;
+      z-index: 20;
+    }
+    .tab-btn {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 3px;
+      background: none;
+      border: none;
+      cursor: pointer;
+      color: var(--text-3);
+      font-size: 10px;
+      font-family: inherit;
+      padding: 6px 0;
+      transition: color 0.15s;
+    }
+    .tab-btn svg { width: 22px; height: 22px; }
+    .tab-btn.active { color: var(--text); }
+
+    /* ===== Forms & Inputs ===== */
+    .field { margin-bottom: 12px; }
+    label {
+      display: block;
+      font-size: 12px;
+      color: var(--text-2);
+      font-weight: 500;
+      margin-bottom: 4px;
+    }
+    input[type="text"],
+    input[type="email"],
+    input[type="password"],
+    input[type="time"],
+    input[type="date"],
+    select,
+    textarea {
+      width: 100%;
+      background: var(--bg-input);
+      border: 1px solid transparent;
+      border-radius: 8px;
+      padding: 10px 12px;
+      font-size: 15px;
+      color: var(--text);
+      font-family: inherit;
+      outline: none;
+      transition: border-color 0.15s;
+      -webkit-appearance: none;
+      appearance: none;
+    }
+    input:focus, select:focus, textarea:focus { border-color: var(--text-3); }
+    textarea { resize: vertical; min-height: 80px; }
+    select { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23999' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 10px center; padding-right: 30px; }
+
+    /* ===== Buttons ===== */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      padding: 10px 16px;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 500;
+      border: none;
+      cursor: pointer;
+      font-family: inherit;
+      transition: opacity 0.15s;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .btn:active { opacity: 0.7; }
+    .btn-primary { background: var(--text); color: var(--bg); }
+    .btn-secondary { background: var(--bg-input); color: var(--text); }
+    .btn-danger-outline { background: transparent; color: var(--danger); border: 1px solid var(--danger); }
+    .btn-sm { padding: 7px 13px; font-size: 13px; }
+    .btn-icon {
+      width: 32px; height: 32px;
+      padding: 0;
+      border-radius: 6px;
+      background: transparent;
+      color: var(--text-3);
+      border: none;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .btn-icon:active { background: var(--bg-input); }
+    .w-full { width: 100%; }
+
+    /* ===== Cards ===== */
+    .card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+    }
+    .card-pad { padding: 16px; }
+
+    /* ===== Section headers ===== */
+    .sec-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 12px;
+    }
+    .sec-title {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text-3);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+
+    /* ===== Log entries ===== */
+    .log-entry {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 14px;
+      margin-bottom: 10px;
+    }
+    .log-head {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 8px;
+    }
+    .log-time { font-size: 12px; color: var(--text-3); margin-bottom: 2px; font-variant-numeric: tabular-nums; }
+    .log-title { font-size: 16px; font-weight: 600; }
+    .log-body { font-size: 14px; color: var(--text-2); margin-top: 6px; white-space: pre-wrap; }
+    .log-reflection {
+      font-size: 13px; color: var(--text-2);
+      border-left: 2px solid var(--border);
+      padding-left: 10px;
+      margin-top: 8px;
+      white-space: pre-wrap;
+    }
+    .log-comment {
+      font-size: 13px; color: var(--c-research);
+      margin-top: 8px;
+      font-style: italic;
+      white-space: pre-wrap;
+    }
+    .log-actions { display: flex; gap: 2px; flex-shrink: 0; }
+
+    /* ===== Add log form ===== */
+    .add-form {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 16px;
+      margin-bottom: 12px;
+    }
+    .time-row {
+      display: grid;
+      grid-template-columns: 1fr 20px 1fr;
+      gap: 4px;
+      align-items: end;
+      margin-bottom: 12px;
+    }
+    .time-sep { text-align: center; color: var(--text-3); font-size: 14px; padding-bottom: 10px; }
+    .form-actions { display: flex; gap: 8px; margin-top: 12px; }
+
+    /* ===== Tasks ===== */
+    .task-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 11px 16px;
+      border-bottom: 1px solid var(--border);
+    }
+    .task-item:last-child { border-bottom: none; }
+    .task-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+    .task-text { flex: 1; font-size: 15px; }
+    .task-text.done { text-decoration: line-through; color: var(--text-3); }
+    .task-check {
+      width: 22px; height: 22px;
+      border: 2px solid var(--border);
+      border-radius: 50%;
+      flex-shrink: 0;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.15s;
+      background: transparent;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .task-check.checked { background: var(--success); border-color: var(--success); }
+
+    /* ===== Stats ===== */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      margin-bottom: 16px;
+    }
+    .stat-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 14px 8px;
+      text-align: center;
+    }
+    .stat-val { font-size: 26px; font-weight: 700; letter-spacing: -1px; }
+    .stat-lbl { font-size: 11px; color: var(--text-3); margin-top: 2px; }
+
+    /* ===== Filter pills ===== */
+    .filter-pills {
+      display: flex;
+      gap: 6px;
+      overflow-x: auto;
+      scrollbar-width: none;
+      padding-bottom: 2px;
+      margin-bottom: 16px;
+      -webkit-overflow-scrolling: touch;
+    }
+    .filter-pills::-webkit-scrollbar { display: none; }
+    .pill {
+      flex-shrink: 0;
+      padding: 6px 14px;
+      border-radius: 20px;
+      font-size: 13px;
+      border: 1px solid var(--border);
+      background: transparent;
+      color: var(--text-2);
+      cursor: pointer;
+      font-family: inherit;
+      transition: all 0.15s;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .pill.active { background: var(--text); color: var(--bg); border-color: var(--text); }
+
+    /* ===== Category group ===== */
+    .cat-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 12px 0 6px;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-2);
+    }
+
+    /* ===== Records ===== */
+    .date-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 14px 16px;
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .date-card:active { opacity: 0.7; }
+    .date-card-date { font-size: 16px; font-weight: 600; }
+    .date-card-meta { font-size: 13px; color: var(--text-3); margin-top: 2px; }
+    .back-btn {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      color: var(--text-2);
+      font-size: 14px;
+      cursor: pointer;
+      background: none;
+      border: none;
+      padding: 0;
+      font-family: inherit;
+      margin-bottom: 16px;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .record-date-head { font-size: 20px; font-weight: 700; margin-bottom: 20px; }
+
+    /* ===== Toast ===== */
+    #toast-wrap {
+      position: fixed;
+      bottom: calc(var(--tab-h) + 12px + env(safe-area-inset-bottom, 0px));
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 1000;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      align-items: center;
+      pointer-events: none;
+    }
+    .toast {
+      background: var(--text);
+      color: var(--bg);
+      padding: 9px 18px;
+      border-radius: 20px;
+      font-size: 14px;
+      font-weight: 500;
+      white-space: nowrap;
+      animation: fadeUp 0.2s ease-out;
+    }
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(8px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    /* ===== Offline banner ===== */
+    #offline-bar {
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      background: #d97706;
+      color: #fff;
+      text-align: center;
+      padding: 6px 12px;
+      font-size: 13px;
+      z-index: 50;
+      display: none;
+    }
+    #offline-bar.show { display: block; }
+
+    /* ===== Misc ===== */
+    .empty { text-align: center; padding: 32px 16px; color: var(--text-3); font-size: 14px; }
+    .divider { height: 1px; background: var(--border); margin: 20px 0; }
+    .row { display: flex; gap: 8px; }
+    .row > * { flex: 1; }
+    .mt-2 { margin-top: 8px; }
+    .mt-3 { margin-top: 12px; }
+    .mt-4 { margin-top: 16px; }
+    .mb-2 { margin-bottom: 8px; }
+    .mb-3 { margin-bottom: 12px; }
+    .mb-4 { margin-bottom: 16px; }
+    .today-head { font-size: 22px; font-weight: 700; margin-bottom: 20px; letter-spacing: -0.5px; }
+    .today-wday { font-size: 14px; color: var(--text-3); font-weight: 400; }
+    .loading { display: flex; align-items: center; justify-content: center; padding: 48px; color: var(--text-3); font-size: 14px; }
+    ::-webkit-scrollbar { width: 4px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+  </style>
+</head>
+<body>
+
+<!-- ===== Offline Banner ===== -->
+<div id="offline-bar">オフライン — 変更はオンライン復帰後に同期されます</div>
+
+<!-- ===== Auth ===== -->
+<div id="auth-screen">
+  <div class="auth-box">
+    <div class="auth-logo">振り返り</div>
+    <div class="auth-sub">毎日の活動・タスクを記録する</div>
+    <div class="field">
+      <label>メールアドレス</label>
+      <input type="email" id="auth-email" placeholder="you@example.com" autocomplete="email">
+    </div>
+    <div class="field">
+      <label>パスワード</label>
+      <input type="password" id="auth-pw" placeholder="••••••••" autocomplete="current-password">
+    </div>
+    <button class="btn btn-primary w-full mt-3" onclick="login()">ログイン</button>
+    <div id="auth-err" style="color:var(--danger);font-size:13px;margin-top:10px;text-align:center;min-height:18px"></div>
+  </div>
+</div>
+
+<!-- ===== App ===== -->
+<div id="app" hidden>
+  <header>
+    <div class="head-title" id="head-title">今日</div>
+    <button class="btn-icon" onclick="logout()" title="ログアウト">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" width="20" height="20">
+        <path d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/>
+      </svg>
+    </button>
+  </header>
+
+  <main>
+    <section id="pane-today" class="tab-pane active">
+      <div id="today-root"><div class="loading">読み込み中...</div></div>
+    </section>
+    <section id="pane-tasks" class="tab-pane">
+      <div id="tasks-root"><div class="loading">読み込み中...</div></div>
+    </section>
+    <section id="pane-records" class="tab-pane">
+      <div id="records-root"><div class="loading">読み込み中...</div></div>
+    </section>
+  </main>
+
+  <nav class="tab-bar">
+    <button class="tab-btn active" id="tbtn-today" onclick="switchTab('today')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" width="22" height="22">
+        <path d="M12 3v2.25m6.364.386l-1.591 1.591M21 12h-2.25m-.386 6.364l-1.591-1.591M12 18.75V21m-4.773-4.227l-1.591 1.591M5.25 12H3m4.227-4.773L5.636 5.636M15.75 12a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0z"/>
+      </svg>
+      今日
+    </button>
+    <button class="tab-btn" id="tbtn-tasks" onclick="switchTab('tasks')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" width="22" height="22">
+        <path d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+      </svg>
+      タスク
+    </button>
+    <button class="tab-btn" id="tbtn-records" onclick="switchTab('records')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" width="22" height="22">
+        <path d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5"/>
+      </svg>
+      記録
+    </button>
+  </nav>
+</div>
+
+<div id="toast-wrap"></div>
+
+<script>
+// =============================================
+// CONFIG — ここにSupabase情報を入力してください
+// =============================================
+const SUPABASE_URL     = 'https://twteprhrtogqrwloinzj.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InR3dGVwcmhydG9ncXJ3bG9pbnpqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg2NTg1NDUsImV4cCI6MjA5NDIzNDU0NX0.viHn2Pf-cXOffzP3uKdBjY4_5LfRdTdwS9gqxlSXemM';
+
+// =============================================
+// INIT
+// =============================================
+const { createClient } = supabase;
+let sb;
+try {
+  sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+} catch (e) {
+  console.error('Supabase init error:', e);
+}
+
+const CATS = ['研究', '授業', 'プライベート', 'その他'];
+const CAT_COLOR = { '研究': '#1D9E75', '授業': '#534AB7', 'プライベート': '#993556', 'その他': '#888780' };
+const WEEK = ['日','月','火','水','木','金','土'];
+
+// =============================================
+// STATE
+// =============================================
+const S = {
+  user:        null,
+  today:       todayStr(),
+  todayData:   null,   // { date, logs[], reflection, task_ids[] }
+  tasks:       [],
+  records:     [],     // [{date, logs, task_ids}]
+  tab:         'today',
+  taskFilter:  'all',
+  showAddLog:  false,
+  recView:     null,   // null = list, 'YYYY-MM-DD' = detail
+  recData:     null,
+  online:      navigator.onLine,
+  queue:       JSON.parse(localStorage.getItem('oq') || '[]'),
+};
+
+// =============================================
+// HELPERS
+// =============================================
+function todayStr() {
+  const d = new Date();
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+}
+function pad(n) { return String(n).padStart(2,'0'); }
+
+function fmtJP(ds) {
+  const d = new Date(ds + 'T00:00:00');
+  return `${d.getFullYear()}年${d.getMonth()+1}月${d.getDate()}日（${WEEK[d.getDay()]}）`;
+}
+
+function esc(s) {
+  if (s == null) return '';
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function catDot(cat) {
+  return `<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${CAT_COLOR[cat]||'#888780'};flex-shrink:0"></span>`;
+}
+
+// =============================================
+// TOAST
+// =============================================
+function toast(msg, ms = 2200) {
+  const w = document.getElementById('toast-wrap');
+  const el = document.createElement('div');
+  el.className = 'toast';
+  el.textContent = msg;
+  w.appendChild(el);
+  setTimeout(() => {
+    el.style.transition = 'opacity 0.3s';
+    el.style.opacity = '0';
+    setTimeout(() => el.remove(), 300);
+  }, ms);
+}
+
+// =============================================
+// AUTH
+// =============================================
+async function login() {
+  const email = document.getElementById('auth-email').value.trim();
+  const pw    = document.getElementById('auth-pw').value;
+  const err   = document.getElementById('auth-err');
+  err.textContent = '';
+
+  if (!email || !pw) { err.textContent = 'メールとパスワードを入力してください'; return; }
+  if (!sb) { err.textContent = 'Supabase の設定が未完了です (index.html を確認)'; return; }
+
+  const { data, error } = await sb.auth.signInWithPassword({ email, password: pw });
+  if (error) { err.textContent = 'ログインできませんでした'; return; }
+  S.user = data.user;
+  launchApp();
+}
+
+async function logout() {
+  if (!confirm('ログアウトしますか？')) return;
+  await sb.auth.signOut();
+  S.user = null;
+  document.getElementById('app').hidden = true;
+  document.getElementById('auth-screen').style.display = '';
+}
+
+async function checkAuth() {
+  if (!sb) return;
+  const { data: { session } } = await sb.auth.getSession();
+  if (session) { S.user = session.user; launchApp(); }
+}
+
+// =============================================
+// APP LAUNCH
+// =============================================
+async function launchApp() {
+  document.getElementById('auth-screen').style.display = 'none';
+  document.getElementById('app').hidden = false;
+  await Promise.all([loadToday(), loadTasks(), loadRecordsList()]);
+  renderToday();
+  renderTasks();
+  renderRecords();
+}
+
+// =============================================
+// DATA — TODAY
+// =============================================
+async function loadToday() {
+  if (S.online && sb) {
+    const { data } = await sb.from('days').select('*')
+      .eq('user_id', S.user.id).eq('date', S.today).single();
+    if (data) {
+      S.todayData = { date: data.date, logs: data.logs||[], reflection: data.reflection||'', task_ids: data.task_ids||[] };
+      localStorage.setItem('day_'+S.today, JSON.stringify(S.todayData));
+      return;
+    }
+  }
+  const c = localStorage.getItem('day_'+S.today);
+  S.todayData = c ? JSON.parse(c) : { date: S.today, logs: [], reflection: '', task_ids: [] };
+}
+
+async function saveToday() {
+  syncReflection();
+  localStorage.setItem('day_'+S.today, JSON.stringify(S.todayData));
+  if (!S.online || !sb) { enqueue('day', mkDayPayload(S.todayData)); toast('オフライン保存しました'); return; }
+  const { error } = await sb.from('days').upsert(mkDayPayload(S.todayData), { onConflict: 'user_id,date' });
+  if (error) { toast('保存に失敗しました'); console.error(error); }
+  else { toast('保存しました ✓'); await loadRecordsList(); }
+}
+
+function mkDayPayload(d) {
+  return { user_id: S.user.id, date: d.date, logs: d.logs, reflection: d.reflection, task_ids: d.task_ids, updated_at: new Date().toISOString() };
+}
+
+function syncReflection() {
+  const el = document.getElementById('today-reflection');
+  if (el) S.todayData.reflection = el.value;
+}
+
+// =============================================
+// DATA — TASKS
+// =============================================
+async function loadTasks() {
+  if (S.online && sb) {
+    const { data } = await sb.from('tasks').select('*').eq('user_id', S.user.id).order('created_at', { ascending: false });
+    if (data) { S.tasks = data; localStorage.setItem('tasks', JSON.stringify(data)); return; }
+  }
+  const c = localStorage.getItem('tasks');
+  if (c) S.tasks = JSON.parse(c);
+}
+
+async function addTask(text, cat) {
+  const tid = String(Date.now()) + Math.random().toString(36).slice(2,6);
+  const task = { user_id: S.user.id, task_id: tid, text, cat, done: false, created_date: S.today, created_at: new Date().toISOString() };
+  S.tasks.unshift(task);
+  S.todayData.task_ids = [...(S.todayData.task_ids||[]), tid];
+  localStorage.setItem('tasks', JSON.stringify(S.tasks));
+  localStorage.setItem('day_'+S.today, JSON.stringify(S.todayData));
+  if (!S.online || !sb) { enqueue('insert_task', task); enqueue('day', mkDayPayload(S.todayData)); return; }
+  await sb.from('tasks').insert(task).then(({error}) => { if(error) console.error(error); });
+  await sb.from('days').upsert(mkDayPayload(S.todayData), { onConflict: 'user_id,date' });
+}
+
+async function toggleTask(tid) {
+  const t = S.tasks.find(x => x.task_id === tid);
+  if (!t) return;
+  t.done = !t.done;
+  localStorage.setItem('tasks', JSON.stringify(S.tasks));
+  if (!S.online || !sb) { enqueue('toggle_task', { tid, done: t.done, uid: S.user.id }); return; }
+  await sb.from('tasks').update({ done: t.done }).eq('user_id', S.user.id).eq('task_id', tid);
+}
+
+async function deleteTask(tid) {
+  S.tasks = S.tasks.filter(x => x.task_id !== tid);
+  localStorage.setItem('tasks', JSON.stringify(S.tasks));
+  if (!S.online || !sb) { enqueue('delete_task', { tid, uid: S.user.id }); return; }
+  await sb.from('tasks').delete().eq('user_id', S.user.id).eq('task_id', tid);
+}
+
+async function deleteCompleted() {
+  const ids = S.tasks.filter(t => t.done).map(t => t.task_id);
+  if (!ids.length) return;
+  S.tasks = S.tasks.filter(t => !t.done);
+  localStorage.setItem('tasks', JSON.stringify(S.tasks));
+  if (!S.online || !sb) { enqueue('delete_completed', { ids, uid: S.user.id }); }
+  else await sb.from('tasks').delete().eq('user_id', S.user.id).in('task_id', ids);
+  toast(`完了済み ${ids.length}件を削除しました`);
+}
+
+// =============================================
+// DATA — RECORDS
+// =============================================
+async function loadRecordsList() {
+  if (!S.online || !sb) {
+    const c = localStorage.getItem('rec_list');
+    if (c) S.records = JSON.parse(c);
+    return;
+  }
+  const { data } = await sb.from('days').select('date,logs,task_ids').eq('user_id', S.user.id).order('date', { ascending: false });
+  if (data) { S.records = data; localStorage.setItem('rec_list', JSON.stringify(data)); }
+}
+
+async function loadRecordDate(date) {
+  if (S.online && sb) {
+    const { data: day } = await sb.from('days').select('*').eq('user_id', S.user.id).eq('date', date).single();
+    if (day) {
+      const tids = day.task_ids || [];
+      let tasks = [];
+      if (tids.length) {
+        const { data: td } = await sb.from('tasks').select('*').eq('user_id', S.user.id).in('task_id', tids);
+        tasks = td || [];
+      }
+      return { ...day, tasks };
+    }
+  }
+  const c = localStorage.getItem('day_'+date);
+  if (c) {
+    const day = JSON.parse(c);
+    const allT = JSON.parse(localStorage.getItem('tasks')||'[]');
+    const tasks = allT.filter(t => (day.task_ids||[]).includes(t.task_id));
+    return { ...day, tasks };
+  }
+  return null;
+}
+
+async function saveRecordData(date, rd) {
+  const payload = mkDayPayload({ ...rd, date });
+  localStorage.setItem('day_'+date, JSON.stringify({ date, logs: rd.logs, reflection: rd.reflection, task_ids: rd.task_ids||[] }));
+  if (!S.online || !sb) { enqueue('day', payload); toast('オフライン保存しました'); return; }
+  const { error } = await sb.from('days').upsert(payload, { onConflict: 'user_id,date' });
+  if (error) { toast('保存に失敗しました'); console.error(error); }
+  else { toast('保存しました ✓'); await loadRecordsList(); if (date === S.today) await loadToday(); }
+}
+
+// =============================================
+// OFFLINE QUEUE
+// =============================================
+function enqueue(action, data) {
+  S.queue.push({ action, data });
+  localStorage.setItem('oq', JSON.stringify(S.queue));
+}
+
+async function flushQueue() {
+  if (!S.online || !sb || !S.queue.length) return;
+  const q = [...S.queue];
+  S.queue = [];
+  localStorage.setItem('oq', '[]');
+  for (const item of q) {
+    try {
+      if (item.action === 'day') await sb.from('days').upsert(item.data, { onConflict: 'user_id,date' });
+      else if (item.action === 'insert_task') await sb.from('tasks').insert(item.data);
+      else if (item.action === 'toggle_task') await sb.from('tasks').update({ done: item.data.done }).eq('user_id', item.data.uid).eq('task_id', item.data.tid);
+      else if (item.action === 'delete_task') await sb.from('tasks').delete().eq('user_id', item.data.uid).eq('task_id', item.data.tid);
+      else if (item.action === 'delete_completed') await sb.from('tasks').delete().eq('user_id', item.data.uid).in('task_id', item.data.ids);
+    } catch(e) { S.queue.push(item); }
+  }
+  localStorage.setItem('oq', JSON.stringify(S.queue));
+  if (q.length) toast('同期しました');
+}
+
+// =============================================
+// RENDER — TODAY
+// =============================================
+function renderToday() {
+  const el = document.getElementById('today-root');
+  if (!S.todayData) { el.innerHTML = '<div class="loading">読み込み中...</div>'; return; }
+
+  const todayTasks = S.tasks.filter(t => (S.todayData.task_ids||[]).includes(t.task_id));
+
+  el.innerHTML = `
+    <div class="today-head">
+      ${fmtJP(S.today).replace('（', '<span class="today-wday">（').replace('）','）</span>')}
+    </div>
+
+    <!-- 活動記録 -->
+    <div class="sec-header">
+      <div class="sec-title">活動記録</div>
+      <button class="btn btn-sm btn-secondary" onclick="toggleAddLog()">${S.showAddLog ? 'キャンセル' : '＋ 追加'}</button>
+    </div>
+    ${S.showAddLog ? logForm(null, null, 'today') : ''}
+    <div id="logs-list">
+      ${S.todayData.logs.length === 0 && !S.showAddLog
+        ? '<div class="empty">まだ記録がありません</div>'
+        : S.todayData.logs.map((l,i) => logEntry(l, i, 'today')).join('')}
+    </div>
+
+    <div class="divider"></div>
+
+    <!-- 振り返り -->
+    <div class="sec-header"><div class="sec-title">今日の振り返り</div></div>
+    <textarea id="today-reflection" placeholder="今日全体の感想・反省..." style="width:100%;min-height:100px" class="mb-4">${esc(S.todayData.reflection)}</textarea>
+
+    <div class="divider"></div>
+
+    <!-- タスク -->
+    <div class="sec-header"><div class="sec-title">今日のタスク</div></div>
+    <div class="add-form mb-3">
+      <div class="row mb-2">
+        <input type="text" id="t-today-input" placeholder="新しいタスク..." style="flex:2" onkeypress="if(event.key==='Enter')doAddTodayTask()">
+        <select id="t-today-cat" style="flex:1">${CATS.map(c=>`<option>${c}</option>`).join('')}</select>
+      </div>
+      <button class="btn btn-secondary w-full" onclick="doAddTodayTask()">追加</button>
+    </div>
+    <div id="today-tasks-list">
+      ${todayTasks.length === 0
+        ? '<div class="empty" style="padding:16px">今日追加したタスクはありません</div>'
+        : `<div class="card">${todayTasks.map(t => taskItem(t,'today')).join('')}</div>`}
+    </div>
+
+    <div class="mt-4 mb-4">
+      <button class="btn btn-primary w-full" onclick="saveToday()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><path d="M4.5 12.75l6 6 9-13.5"/></svg>
+        保存する
+      </button>
+    </div>
+  `;
+
+  // reflection に oninput バインド
+  const r = document.getElementById('today-reflection');
+  if (r) r.addEventListener('input', () => { S.todayData.reflection = r.value; });
+}
+
+// ===== Log form =====
+function logForm(log, idx, ctx) {
+  const l = log || { start:'', end:'', title:'', body:'', reflection:'', comment:'' };
+  const isEdit = idx !== null;
+  const saveF = ctx === 'today'
+    ? (isEdit ? `saveTodayLogEdit(${idx})` : 'submitTodayLog()')
+    : (isEdit ? `saveRecLogEdit(${idx})`   : 'submitRecLog()');
+  const cancelF = ctx === 'today'
+    ? (isEdit ? `cancelTodayLogEdit(${idx})` : 'toggleAddLog()')
+    : (isEdit ? `cancelRecLogEdit(${idx})`   : 'toggleAddRecLog()');
+  const pfx = ctx === 'today' ? 'lf' : 'rlf';
+
+  return `
+    <div class="add-form ${isEdit?'':'mb-3'}">
+      <div class="time-row">
+        <div><label>開始</label><input type="time" id="${pfx}-start" value="${esc(l.start)}"></div>
+        <div class="time-sep">〜</div>
+        <div><label>終了</label><input type="time" id="${pfx}-end" value="${esc(l.end)}"></div>
+      </div>
+      <div class="field">
+        <label>タイトル <span style="color:var(--danger)">*</span></label>
+        <input type="text" id="${pfx}-title" placeholder="何をした？" value="${esc(l.title)}">
+      </div>
+      <div class="field">
+        <label>内容</label>
+        <textarea id="${pfx}-body" placeholder="詳細（任意）" style="min-height:60px">${esc(l.body)}</textarea>
+      </div>
+      <div class="field">
+        <label>感想</label>
+        <textarea id="${pfx}-refl" placeholder="感想・気づき（任意）" style="min-height:60px">${esc(l.reflection)}</textarea>
+      </div>
+      ${(isEdit || ctx === 'record') ? `
+      <div class="field">
+        <label>後日コメント</label>
+        <textarea id="${pfx}-comment" placeholder="後から追記..." style="min-height:60px">${esc(l.comment)}</textarea>
+      </div>` : ''}
+      <div class="form-actions">
+        <button class="btn btn-primary" onclick="${saveF}">${isEdit ? '更新' : '追加'}</button>
+        <button class="btn btn-secondary" onclick="${cancelF}">キャンセル</button>
+      </div>
+    </div>`;
+}
+
+// ===== Log entry =====
+function logEntry(log, i, ctx) {
+  return `
+    <div class="log-entry" id="le-${ctx}-${i}">
+      <div class="log-head">
+        <div style="flex:1">
+          ${(log.start||log.end) ? `<div class="log-time">${esc(log.start)}${log.end?' 〜 '+esc(log.end):''}</div>` : ''}
+          <div class="log-title">${esc(log.title)}</div>
+        </div>
+        <div class="log-actions">
+          <button class="btn-icon" onclick="editLog(${i},'${ctx}')" title="編集">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><path d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931z"/><path d="M19.5 7.125L18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10"/></svg>
+          </button>
+          <button class="btn-icon" onclick="deleteLog(${i},'${ctx}')" title="削除" style="color:var(--danger)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><path d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0"/></svg>
+          </button>
+        </div>
+      </div>
+      ${log.body       ? `<div class="log-body">${esc(log.body)}</div>`           : ''}
+      ${log.reflection ? `<div class="log-reflection">💭 ${esc(log.reflection)}</div>` : ''}
+      ${log.comment    ? `<div class="log-comment">📝 ${esc(log.comment)}</div>` : ''}
+    </div>`;
+}
+
+// ===== Log actions =====
+function toggleAddLog() { S.showAddLog = !S.showAddLog; renderToday(); }
+
+function readLogForm(pfx) {
+  return {
+    start:      (document.getElementById(pfx+'-start')?.value   || ''),
+    end:        (document.getElementById(pfx+'-end')?.value     || ''),
+    title:      (document.getElementById(pfx+'-title')?.value   || '').trim(),
+    body:       (document.getElementById(pfx+'-body')?.value    || '').trim(),
+    reflection: (document.getElementById(pfx+'-refl')?.value    || '').trim(),
+    comment:    (document.getElementById(pfx+'-comment')?.value || '').trim(),
+  };
+}
+
+function submitTodayLog() {
+  const l = readLogForm('lf');
+  if (!l.title) { toast('タイトルを入力してください'); return; }
+  S.todayData.logs.push(l);
+  S.showAddLog = false;
+  renderToday();
+}
+
+function editLog(i, ctx) {
+  const el = document.getElementById(`le-${ctx}-${i}`);
+  const logs = ctx === 'today' ? S.todayData.logs : S.recData.logs;
+  el.outerHTML = `<div id="le-${ctx}-${i}">${logForm(logs[i], i, ctx)}</div>`;
+}
+
+function saveTodayLogEdit(i) {
+  const l = readLogForm('lf');
+  if (!l.title) { toast('タイトルを入力してください'); return; }
+  // preserve existing comment if form didn't have the field (shouldn't happen in edit mode)
+  if (!l.comment && S.todayData.logs[i].comment) l.comment = S.todayData.logs[i].comment;
+  S.todayData.logs[i] = l;
+  const el = document.getElementById(`le-today-${i}`);
+  el.outerHTML = logEntry(l, i, 'today');
+}
+
+function cancelTodayLogEdit(i) {
+  const el = document.getElementById(`le-today-${i}`);
+  el.outerHTML = logEntry(S.todayData.logs[i], i, 'today');
+}
+
+function deleteLog(i, ctx) {
+  if (ctx === 'today') { S.todayData.logs.splice(i,1); renderToday(); }
+  else { S.recData.logs.splice(i,1); renderRecDetail(); }
+}
+
+// ===== Task item =====
+function taskItem(t, ctx) {
+  return `
+    <div class="task-item" id="ti-${t.task_id}">
+      <div class="task-dot" style="background:${CAT_COLOR[t.cat]||'#888780'}"></div>
+      <div class="task-text${t.done?' done':''}">${esc(t.text)}</div>
+      <button class="task-check${t.done?' checked':''}" onclick="doToggleTask('${t.task_id}','${ctx}')">
+        ${t.done ? '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" width="11" height="11"><path d="M4.5 12.75l6 6 9-13.5"/></svg>' : ''}
+      </button>
+      <button class="btn-icon" onclick="doDeleteTask('${t.task_id}','${ctx}')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" width="15" height="15"><path d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0"/></svg>
+      </button>
+    </div>`;
+}
+
+async function doAddTodayTask() {
+  const inp = document.getElementById('t-today-input');
+  const cat = document.getElementById('t-today-cat');
+  const txt = inp.value.trim();
+  if (!txt) return;
+  await addTask(txt, cat.value);
+  inp.value = '';
+  renderToday();
+  renderTasks();
+}
+
+async function doToggleTask(tid, ctx) {
+  await toggleTask(tid);
+  if (ctx === 'today') renderToday(); else renderTasks();
+}
+
+async function doDeleteTask(tid, ctx) {
+  S.todayData.task_ids = (S.todayData.task_ids||[]).filter(id => id !== tid);
+  localStorage.setItem('day_'+S.today, JSON.stringify(S.todayData));
+  await deleteTask(tid);
+  if (ctx === 'today') renderToday(); else renderTasks();
+}
+
+// =============================================
+// RENDER — TASKS
+// =============================================
+function renderTasks() {
+  const el = document.getElementById('tasks-root');
+  const total = S.tasks.length;
+  const done  = S.tasks.filter(t => t.done).length;
+  const undone = total - done;
+  const rate   = total > 0 ? Math.round(done/total*100) : 0;
+  const f = S.taskFilter;
+
+  let listHTML = '';
+  if (f === 'all') {
+    const groups = CATS.map(cat => ({ cat, tasks: S.tasks.filter(t => t.cat === cat && !t.done) })).filter(g => g.tasks.length);
+    if (!groups.length) listHTML = '<div class="empty">未完了のタスクはありません 🎉</div>';
+    else listHTML = groups.map(g => `
+      <div class="cat-header">${catDot(g.cat)} ${g.cat}</div>
+      <div class="card mb-3">${g.tasks.map(t => taskItem(t,'tasks')).join('')}</div>
+    `).join('');
+  } else if (f === 'done') {
+    const ts = S.tasks.filter(t => t.done);
+    listHTML = ts.length ? `<div class="card mb-3">${ts.map(t=>taskItem(t,'tasks')).join('')}</div>` : '<div class="empty">完了済みのタスクはありません</div>';
+  } else {
+    const ts = S.tasks.filter(t => t.cat === f && !t.done);
+    listHTML = ts.length ? `<div class="card mb-3">${ts.map(t=>taskItem(t,'tasks')).join('')}</div>` : '<div class="empty">タスクはありません</div>';
+  }
+
+  el.innerHTML = `
+    <div class="stats-grid">
+      <div class="stat-card"><div class="stat-val">${undone}</div><div class="stat-lbl">未完了</div></div>
+      <div class="stat-card"><div class="stat-val">${done}</div><div class="stat-lbl">完了</div></div>
+      <div class="stat-card"><div class="stat-val">${rate}%</div><div class="stat-lbl">完了率</div></div>
+    </div>
+
+    <div class="filter-pills">
+      ${[['all','すべて'],['研究','研究'],['授業','授業'],['プライベート','プライベート'],['その他','その他'],['done','完了済み']]
+        .map(([v,lbl]) => `<button class="pill${f===v?' active':''}" onclick="setFilter('${v}')">${lbl}</button>`).join('')}
+    </div>
+
+    ${listHTML}
+
+    ${done > 0 ? `<button class="btn btn-danger-outline w-full mb-4" onclick="doDeleteCompleted()">完了済みを一括削除（${done}件）</button>` : ''}
+
+    <div class="divider"></div>
+    <div class="sec-title mb-3">タスクを追加</div>
+    <div class="card card-pad">
+      <div class="field">
+        <input type="text" id="t-tab-input" placeholder="新しいタスク..." onkeypress="if(event.key==='Enter')doAddTabTask()">
+      </div>
+      <div class="row">
+        <select id="t-tab-cat">${CATS.map(c=>`<option>${c}</option>`).join('')}</select>
+        <button class="btn btn-primary" onclick="doAddTabTask()">追加</button>
+      </div>
+    </div>
+  `;
+}
+
+function setFilter(f) { S.taskFilter = f; renderTasks(); }
+
+async function doAddTabTask() {
+  const inp = document.getElementById('t-tab-input');
+  const cat = document.getElementById('t-tab-cat');
+  const txt = inp.value.trim();
+  if (!txt) return;
+  await addTask(txt, cat.value);
+  inp.value = '';
+  renderTasks();
+  renderToday();
+}
+
+async function doDeleteCompleted() {
+  const n = S.tasks.filter(t=>t.done).length;
+  if (!confirm(`完了済みの${n}件を削除しますか？`)) return;
+  await deleteCompleted();
+  renderTasks();
+}
+
+// =============================================
+// RENDER — RECORDS
+// =============================================
+function renderRecords() {
+  const el = document.getElementById('records-root');
+  if (S.recView) { renderRecDetail(); return; }
+
+  const list = S.records.filter(r => r.date !== S.today);
+  el.innerHTML = `
+    <div class="sec-header mb-4">
+      <div class="sec-title">過去の記録</div>
+      <input type="date" id="rec-picker" style="width:auto;padding:6px 10px;font-size:13px" onchange="openRec(this.value)">
+    </div>
+    ${list.length === 0
+      ? '<div class="empty">まだ過去の記録がありません</div>'
+      : list.map(r => `
+        <div class="date-card" onclick="openRec('${r.date}')">
+          <div>
+            <div class="date-card-date">${fmtJP(r.date)}</div>
+            <div class="date-card-meta">活動 ${(r.logs||[]).length}件 · タスク ${(r.task_ids||[]).length}件</div>
+          </div>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" width="16" height="16" style="color:var(--text-3)"><path d="M8.25 4.5l7.5 7.5-7.5 7.5"/></svg>
+        </div>`).join('')}
+  `;
+}
+
+async function openRec(date) {
+  if (!date) return;
+  S.recView = date;
+  S.recData = null;
+  document.getElementById('records-root').innerHTML = '<div class="loading">読み込み中...</div>';
+  const d = await loadRecordDate(date);
+  S.recData = d || { date, logs:[], reflection:'', task_ids:[], tasks:[] };
+  renderRecDetail();
+}
+
+function renderRecDetail() {
+  const el = document.getElementById('records-root');
+  const d = S.recData;
+  if (!d) { el.innerHTML = '<div class="loading">読み込み中...</div>'; return; }
+
+  el.innerHTML = `
+    <button class="back-btn" onclick="closeRec()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><path d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18"/></svg>
+      一覧に戻る
+    </button>
+    <div class="record-date-head">${fmtJP(d.date)}</div>
+
+    <!-- ログ -->
+    <div class="sec-header">
+      <div class="sec-title">活動記録</div>
+      <button class="btn btn-sm btn-secondary" onclick="toggleAddRecLog()">＋ 追加</button>
+    </div>
+    <div id="rec-addlog-area"></div>
+    <div id="rec-logs-list">
+      ${d.logs.length === 0
+        ? '<div class="empty">記録がありません</div>'
+        : d.logs.map((l,i) => logEntry(l, i, 'record')).join('')}
+    </div>
+
+    <div class="divider"></div>
+
+    <!-- 振り返り -->
+    <div class="sec-header"><div class="sec-title">全体の振り返り</div></div>
+    <textarea id="rec-refl" placeholder="振り返りを書く..." style="width:100%;min-height:100px" class="mb-4">${esc(d.reflection)}</textarea>
+
+    <div class="divider"></div>
+
+    <!-- タスク -->
+    <div class="sec-header"><div class="sec-title">タスク</div></div>
+    ${(d.tasks||[]).length === 0
+      ? '<div class="empty mb-4">タスクはありません</div>'
+      : `<div class="card mb-4">${(d.tasks||[]).map(t => `
+          <div class="task-item">
+            <div class="task-dot" style="background:${CAT_COLOR[t.cat]||'#888780'}"></div>
+            <div class="task-text${t.done?' done':''}">${esc(t.text)}</div>
+            ${t.done ? '<span style="font-size:12px;color:var(--text-3);flex-shrink:0">完了</span>' : ''}
+          </div>`).join('')}</div>`}
+
+    <button class="btn btn-primary w-full mb-4" onclick="doSaveRec()">保存する</button>
+  `;
+
+  const r = document.getElementById('rec-refl');
+  if (r) { r.addEventListener('input', () => { S.recData.reflection = r.value; }); }
+}
+
+let showAddRecLog = false;
+function toggleAddRecLog() {
+  showAddRecLog = !showAddRecLog;
+  const area = document.getElementById('rec-addlog-area');
+  if (area) area.innerHTML = showAddRecLog ? logForm(null, null, 'record') : '';
+}
+
+function submitRecLog() {
+  const l = readLogForm('rlf');
+  if (!l.title) { toast('タイトルを入力してください'); return; }
+  S.recData.logs.push(l);
+  showAddRecLog = false;
+  renderRecDetail();
+}
+
+function saveRecLogEdit(i) {
+  const l = readLogForm('rlf');
+  if (!l.title) { toast('タイトルを入力してください'); return; }
+  S.recData.logs[i] = l;
+  const el = document.getElementById(`le-record-${i}`);
+  el.outerHTML = logEntry(l, i, 'record');
+}
+
+function cancelRecLogEdit(i) {
+  const el = document.getElementById(`le-record-${i}`);
+  el.outerHTML = logEntry(S.recData.logs[i], i, 'record');
+}
+
+async function doSaveRec() {
+  const r = document.getElementById('rec-refl');
+  if (r) S.recData.reflection = r.value;
+  await saveRecordData(S.recView, S.recData);
+  await loadRecordsList();
+  renderRecords();
+}
+
+function closeRec() {
+  S.recView = null;
+  S.recData = null;
+  showAddRecLog = false;
+  renderRecords();
+}
+
+// =============================================
+// TAB SWITCH
+// =============================================
+function switchTab(tab) {
+  S.tab = tab;
+  document.querySelectorAll('.tab-pane').forEach(el => el.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+  document.getElementById(`pane-${tab}`).classList.add('active');
+  document.getElementById(`tbtn-${tab}`).classList.add('active');
+  const labels = { today:'今日', tasks:'タスク', records:'記録' };
+  document.getElementById('head-title').textContent = labels[tab];
+}
+
+// =============================================
+// OFFLINE
+// =============================================
+function setupOffline() {
+  window.addEventListener('online', async () => {
+    S.online = true;
+    document.getElementById('offline-bar').classList.remove('show');
+    await flushQueue();
+    if (S.user) {
+      await Promise.all([loadToday(), loadTasks(), loadRecordsList()]);
+      renderToday(); renderTasks(); renderRecords();
+    }
+  });
+  window.addEventListener('offline', () => {
+    S.online = false;
+    document.getElementById('offline-bar').classList.add('show');
+  });
+  if (!navigator.onLine) document.getElementById('offline-bar').classList.add('show');
+}
+
+// =============================================
+// SERVICE WORKER
+// =============================================
+function registerSW() {
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('./sw.js').catch(() => {});
+  }
+}
+
+// Enter key on auth fields
+document.getElementById('auth-pw').addEventListener('keypress', e => {
+  if (e.key === 'Enter') login();
+});
+
+// =============================================
+// MAIN
+// =============================================
+async function init() {
+  setupOffline();
+  registerSW();
+  await checkAuth();
+}
+
+init();
+</script>
+</body>
+</html>
