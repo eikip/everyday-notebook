@@ -1631,6 +1631,7 @@ async function doDeleteSubtask(tid, idx, ctx) {
 }
 
 async function doDeleteTask(tid, ctx) {
+  if (!confirm('このタスクを削除しますか？')) return;
   S.todayData.task_ids = (S.todayData.task_ids||[]).filter(id => id !== tid);
   localStorage.setItem('day_'+S.today, JSON.stringify(S.todayData));
   await deleteTask(tid);
