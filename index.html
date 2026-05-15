@@ -1436,6 +1436,11 @@ async function toggleAddLog() {
   S.showAddLog = !S.showAddLog;
   if (S.showAddLog && !S.logDraft) {
     S.logDraft = await _readDraft();
+    if (!S.logDraft) {
+      const logs = S.todayData.logs || [];
+      const lastEnd = logs.length > 0 ? logs[logs.length - 1].end : null;
+      if (lastEnd) S.logDraft = { start: lastEnd };
+    }
   }
   if (!S.showAddLog) S.logDraft = null;
   renderToday();
