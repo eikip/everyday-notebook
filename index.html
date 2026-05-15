@@ -89,6 +89,7 @@
       overflow-y: auto;
       -webkit-overflow-scrolling: touch;
       padding-bottom: calc(var(--tab-h) + env(safe-area-inset-bottom, 0px) + 8px);
+      position: relative;
     }
     .tab-pane {
       display: none;
@@ -614,6 +615,20 @@
     .today-head { font-size: 22px; font-weight: 700; margin-bottom: 20px; letter-spacing: -0.5px; }
     .today-wday { font-size: 14px; color: var(--text-3); font-weight: 400; }
     .loading { display: flex; align-items: center; justify-content: center; padding: 48px; color: var(--text-3); font-size: 14px; }
+    #ptr-indicator {
+      position: absolute; left: 0; right: 0; top: 0;
+      display: flex; align-items: center; justify-content: center;
+      gap: 8px; font-size: 13px; color: var(--text-3);
+      height: 56px; transform: translateY(-56px);
+      transition: opacity .15s;
+      pointer-events: none; z-index: 5;
+    }
+    #ptr-indicator .ptr-spinner {
+      width: 18px; height: 18px; border: 2px solid var(--border);
+      border-top-color: var(--c-research); border-radius: 50%;
+      animation: spin .7s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
     ::-webkit-scrollbar { width: 4px; }
     ::-webkit-scrollbar-track { background: transparent; }
     ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
@@ -653,7 +668,11 @@
     </button>
   </header>
 
-  <main>
+  <main id="main-scroll">
+    <div id="ptr-indicator" style="opacity:0">
+      <div class="ptr-spinner"></div>
+      <span id="ptr-label">引っ張って更新</span>
+    </div>
     <section id="pane-today" class="tab-pane active">
       <div id="today-root"><div class="loading">読み込み中...</div></div>
     </section>
@@ -2164,6 +2183,68 @@ document.getElementById('auth-pw').addEventListener('keypress', e => {
 // =============================================
 // MAIN
 // =============================================
+// =============================================
+// PULL TO REFRESH
+// =============================================
+(function setupPTR() {
+  const THRESHOLD = 72;
+  let startY = 0, pulling = false, triggered = false;
+  let currentY = 0;
+
+  const mainEl = document.getElementById('main-scroll');
+  const indicator = document.getElementById('ptr-indicator');
+  const label = document.getElementById('ptr-label');
+
+  function atTop() { return mainEl.scrollTop <= 0; }
+
+  mainEl.addEventListener('touchstart', e => {
+    if (!atTop()) return;
+    startY = e.touches[0].clientY;
+    pulling = true;
+    triggered = false;
+  }, { passive: true });
+
+  mainEl.addEventListener('touchmove', e => {
+    if (!pulling) return;
+    currentY = e.touches[0].clientY;
+    const dist = Math.max(0, currentY - startY);
+    if (dist <= 0) return;
+    const progress = Math.min(dist / THRESHOLD, 1);
+    const pull = Math.min(dist * 0.45, THRESHOLD * 0.45);
+    indicator.style.transform = `translateY(calc(-56px + ${pull}px))`;
+    indicator.style.opacity = progress;
+    if (progress >= 1 && !triggered) {
+      label.textContent = '離して更新';
+      triggered = true;
+    } else if (progress < 1) {
+      label.textContent = '引っ張って更新';
+      triggered = false;
+    }
+  }, { passive: true });
+
+  async function reset(doRefresh) {
+    pulling = false;
+    indicator.style.transition = 'transform .25s ease, opacity .2s';
+    indicator.style.transform = 'translateY(-56px)';
+    indicator.style.opacity = '0';
+    setTimeout(() => { indicator.style.transition = ''; }, 300);
+    if (doRefresh && S.user) {
+      label.textContent = '更新中...';
+      indicator.style.opacity = '1';
+      indicator.style.transform = 'translateY(0px)';
+      await Promise.all([loadToday(), loadTasks(), loadRecordsList(), loadGoals()]);
+      renderToday(); renderTasks(); renderRecords(); renderGoals();
+      indicator.style.transition = 'transform .25s ease, opacity .2s';
+      indicator.style.transform = 'translateY(-56px)';
+      indicator.style.opacity = '0';
+      setTimeout(() => { indicator.style.transition = ''; label.textContent = '引っ張って更新'; }, 300);
+    }
+  }
+
+  mainEl.addEventListener('touchend', () => { reset(triggered); }, { passive: true });
+  mainEl.addEventListener('touchcancel', () => { reset(false); }, { passive: true });
+})();
+
 async function init() {
   setupOffline();
   registerSW();
