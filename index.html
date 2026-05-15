@@ -861,13 +861,13 @@ async function loadToday() {
   S.todayData = c ? JSON.parse(c) : { date: S.today, logs: [], reflection: '', task_ids: [] };
 }
 
-async function saveToday() {
+async function saveToday(silent = false) {
   syncReflection();
   localStorage.setItem('day_'+S.today, JSON.stringify(S.todayData));
-  if (!S.online || !sb) { enqueue('day', mkDayPayload(S.todayData)); toast('オフライン保存しました'); return; }
+  if (!S.online || !sb) { enqueue('day', mkDayPayload(S.todayData)); if (!silent) toast('オフライン保存しました'); return; }
   const { error } = await sb.from('days').upsert(mkDayPayload(S.todayData), { onConflict: 'user_id,date' });
   if (error) { toast('エラー: ' + (error.message || JSON.stringify(error)), 5000); console.error(error); }
-  else { toast('保存しました ✓'); await loadRecordsList(); }
+  else { if (!silent) toast('保存しました ✓'); await loadRecordsList(); }
 }
 
 function mkDayPayload(d) {
@@ -1255,16 +1255,14 @@ function setNow(id) {
 function logForm(log, idx, ctx) {
   const isEdit = idx !== null;
   const l = log || { start: isEdit ? '' : defaultHour(), end:'', title:'', body:'', reflection:'', comment:'' };
-  const saveF = ctx === 'today'
-    ? (isEdit ? `saveTodayLogEdit(${idx})` : 'submitTodayLog()')
-    : (isEdit ? `saveRecLogEdit(${idx})`   : 'submitRecLog()');
   const cancelF = ctx === 'today'
     ? (isEdit ? `cancelTodayLogEdit(${idx})` : 'toggleAddLog()')
     : (isEdit ? `cancelRecLogEdit(${idx})`   : 'toggleAddRecLog()');
   const pfx = ctx === 'today' ? 'lf' : 'rlf';
 
   return `
-    <div class="add-form ${isEdit?'':'mb-3'}">
+    <div class="add-form ${isEdit?'':'mb-3'}" id="${pfx}-form"
+         onfocusout="_autoSaveLog('${pfx}','${ctx}','${isEdit}',${idx})">
       <div class="time-row">
         <div class="time-row-item">
           <label>開始</label>
@@ -1294,7 +1292,6 @@ function logForm(log, idx, ctx) {
         <textarea id="${pfx}-comment" placeholder="後から追記..." style="min-height:60px">${esc(l.comment)}</textarea>
       </div>` : ''}
       <div class="form-actions">
-        <button class="btn btn-primary" onclick="${saveF}">${isEdit ? '更新' : '追加'}</button>
         <button class="btn btn-secondary" onclick="${cancelF}">キャンセル</button>
       </div>
     </div>`;
@@ -1336,6 +1333,42 @@ function readLogForm(pfx) {
     reflection: (document.getElementById(pfx+'-refl')?.value    || '').trim(),
     comment:    (document.getElementById(pfx+'-comment')?.value || '').trim(),
   };
+}
+
+function _autoSaveLog(pfx, ctx, isEditStr, idx) {
+  setTimeout(() => {
+    const form = document.getElementById(`${pfx}-form`);
+    if (!form) return;
+    if (form.contains(document.activeElement)) return;
+    const l = readLogForm(pfx);
+    if (!l.title) return;
+    const isEdit = isEditStr === 'true';
+    if (ctx === 'today') {
+      if (isEdit) {
+        if (!l.comment && S.todayData.logs[idx]?.comment) l.comment = S.todayData.logs[idx].comment;
+        S.todayData.logs[idx] = l;
+        const el = document.getElementById(`le-today-${idx}`);
+        if (el) el.outerHTML = logEntry(l, idx, 'today');
+      } else {
+        S.todayData.logs.push(l);
+        S.showAddLog = false;
+        renderToday();
+      }
+      saveToday(true);
+    } else {
+      if (isEdit) {
+        if (!l.comment && S.recData.logs[idx]?.comment) l.comment = S.recData.logs[idx].comment;
+        S.recData.logs[idx] = l;
+        const el = document.getElementById(`le-record-${idx}`);
+        if (el) el.outerHTML = logEntry(l, idx, 'record');
+      } else {
+        S.recData.logs.push(l);
+        showAddRecLog = false;
+        renderRecDetail();
+      }
+      saveRecordData(S.recView, S.recData);
+    }
+  }, 200);
 }
 
 function submitTodayLog() {
