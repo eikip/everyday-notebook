@@ -1,7 +1,5 @@
-const CACHE = 'furikaeri-v14';
+const CACHE = 'furikaeri-v15';
 const PRECACHE = [
-  './',
-  './index.html',
   './manifest.json',
   'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js',
 ];
@@ -23,15 +21,25 @@ self.addEventListener('activate', e => {
 self.addEventListener('fetch', e => {
   const url = new URL(e.request.url);
 
-  // Supabase API → network first（オフライン時のみキャッシュフォールバック）
+  // Supabase API → network first
   if (url.hostname.includes('supabase.co')) {
+    e.respondWith(fetch(e.request).catch(() => caches.match(e.request)));
+    return;
+  }
+
+  // index.html → network first（常に最新を取得、オフライン時のみキャッシュ）
+  if (e.request.mode === 'navigate') {
     e.respondWith(
-      fetch(e.request).catch(() => caches.match(e.request))
+      fetch(e.request).then(res => {
+        const clone = res.clone();
+        caches.open(CACHE).then(c => c.put(e.request, clone));
+        return res;
+      }).catch(() => caches.match(e.request) || caches.match('./index.html'))
     );
     return;
   }
 
-  // 静的アセット → cache first
+  // その他の静的アセット → cache first
   e.respondWith(
     caches.match(e.request).then(cached => {
       if (cached) return cached;
