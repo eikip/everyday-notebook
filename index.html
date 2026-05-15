@@ -731,6 +731,7 @@ const S = {
   tab:         'today',
   taskFilter:  'all',
   showAddLog:  false,
+  logDraft:    null,
   recView:     null,   // null = list, 'YYYY-MM-DD' = detail
   recData:     null,
   online:      navigator.onLine,
@@ -1078,6 +1079,12 @@ function renderToday() {
   const el = document.getElementById('today-root');
   if (!S.todayData) { el.innerHTML = '<div class="loading">読み込み中...</div>'; return; }
 
+  // フォームが開いていれば内容を保存してから再描画
+  if (S.showAddLog && document.getElementById('lf-title') !== null) {
+    S.logDraft = readLogForm('lf');
+  }
+  if (!S.showAddLog) S.logDraft = null;
+
   const todayTasks = S.tasks.filter(t => (S.todayData.task_ids||[]).includes(t.task_id));
 
   el.innerHTML = `
@@ -1090,7 +1097,7 @@ function renderToday() {
       <div class="sec-title">活動記録</div>
       <button class="btn btn-sm btn-secondary" onclick="toggleAddLog()">${S.showAddLog ? 'キャンセル' : '＋ 追加'}</button>
     </div>
-    ${S.showAddLog ? logForm(null, null, 'today') : ''}
+    ${S.showAddLog ? logForm(S.logDraft, null, 'today') : ''}
     <div id="logs-list">
       ${S.todayData.logs.length === 0 && !S.showAddLog
         ? '<div class="empty">まだ記録がありません</div>'
@@ -1322,7 +1329,7 @@ function logEntry(log, i, ctx) {
 }
 
 // ===== Log actions =====
-function toggleAddLog() { S.showAddLog = !S.showAddLog; renderToday(); }
+function toggleAddLog() { S.showAddLog = !S.showAddLog; if (!S.showAddLog) S.logDraft = null; renderToday(); }
 
 function readLogForm(pfx) {
   return {
@@ -1352,6 +1359,7 @@ function _autoSaveLog(pfx, ctx, isEditStr, idx) {
       } else {
         S.todayData.logs.push(l);
         S.showAddLog = false;
+        S.logDraft = null;
         renderToday();
       }
       saveToday(true);
