@@ -1433,7 +1433,7 @@ function readLogForm(pfx) {
 }
 
 function _autoSaveLog(pfx, ctx, isEditStr, idx) {
-  setTimeout(() => {
+  setTimeout(async () => {
     const form = document.getElementById(`${pfx}-form`);
     if (!form) return;
     if (form.contains(document.activeElement)) return;
