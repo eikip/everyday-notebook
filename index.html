@@ -1381,7 +1381,15 @@ function logForm(log, idx, ctx) {
         <span class="time-row-sep">〜</span>
         <div class="time-row-item">
           <label>終了</label>
-          ${timePicker(pfx+'-end', l.end)}
+          <div style="display:flex;flex-direction:column;gap:4px">
+            <div id="${pfx}-end-wrap" style="${l.end==='進行中'?'display:none':''}">
+              ${timePicker(pfx+'-end', l.end==='進行中'?'':l.end)}
+            </div>
+            <label style="display:flex;align-items:center;gap:6px;font-size:13px;color:var(--text-2);cursor:pointer;margin:0">
+              <input type="checkbox" id="${pfx}-ongoing" ${l.end==='進行中'?'checked':''} onchange="toggleOngoing('${pfx}')">
+              現在進行中
+            </label>
+          </div>
         </div>
       </div>
       <div class="field">
@@ -1413,7 +1421,7 @@ function logEntry(log, i, ctx) {
     <div class="log-entry" id="le-${ctx}-${i}">
       <div class="log-head">
         <div style="flex:1">
-          ${(log.start||log.end) ? `<div class="log-time">${esc(log.start)}${log.end?' 〜 '+esc(log.end):''}</div>` : ''}
+          ${(log.start||log.end) ? `<div class="log-time">${esc(log.start)}${log.end ? ' 〜 ' + (log.end==='進行中' ? '<span style="color:var(--c-research);font-size:11px;font-weight:600">進行中</span>' : esc(log.end)) : ''}</div>` : ''}
           <div class="log-title">${esc(log.title)}</div>
         </div>
         <div class="log-actions">
@@ -1447,14 +1455,21 @@ async function toggleAddLog() {
 }
 
 function readLogForm(pfx) {
+  const ongoing = document.getElementById(pfx+'-ongoing')?.checked;
   return {
     start:      (document.getElementById(pfx+'-start')?.value   || ''),
-    end:        (document.getElementById(pfx+'-end')?.value     || ''),
+    end:        ongoing ? '進行中' : (document.getElementById(pfx+'-end')?.value || ''),
     title:      (document.getElementById(pfx+'-title')?.value   || '').trim(),
     body:       (document.getElementById(pfx+'-body')?.value    || '').trim(),
     reflection: (document.getElementById(pfx+'-refl')?.value    || '').trim(),
     comment:    (document.getElementById(pfx+'-comment')?.value || '').trim(),
   };
+}
+
+function toggleOngoing(pfx) {
+  const checked = document.getElementById(pfx+'-ongoing')?.checked;
+  const wrap = document.getElementById(pfx+'-end-wrap');
+  if (wrap) wrap.style.display = checked ? 'none' : '';
 }
 
 function _autoSaveLog(pfx, ctx, isEditStr, idx) {
@@ -1914,7 +1929,7 @@ async function renderWeekView() {
         <div class="card" style="padding:8px 14px">
           ${logs.map(l => `
             <div style="padding:6px 0;border-bottom:1px solid var(--border);font-size:14px">
-              ${l.start||l.end ? `<span style="font-size:12px;color:var(--text-3);margin-right:8px">${l.start||''}${l.end?'〜'+l.end:''}</span>` : ''}
+              ${l.start||l.end ? `<span style="font-size:12px;color:var(--text-3);margin-right:8px">${l.start||''}${l.end ? '〜' + (l.end==='進行中' ? '進行中' : l.end) : ''}</span>` : ''}
               ${esc(l.title)}
               ${l.reflection ? `<div style="font-size:12px;color:var(--text-3);margin-top:2px">💭 ${esc(l.reflection)}</div>` : ''}
             </div>`).join('')}
