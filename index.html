@@ -836,6 +836,85 @@ async function checkAuth() {
 }
 
 // =============================================
+// REALTIME & DRAFT SYNC
+// =============================================
+let _rtChannel = null;
+let _selfSaveTs = 0;
+
+function setupRealtime() {
+  if (!sb || !S.user) return;
+  if (_rtChannel) { sb.removeChannel(_rtChannel); _rtChannel = null; }
+  const uid = S.user.id;
+  _rtChannel = sb.channel('sync-' + uid)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'days', filter: `user_id=eq.${uid}` }, async payload => {
+      if (Date.now() - _selfSaveTs < 3000 || !payload.new) return;
+      const d = payload.new;
+      if (d.date === S.today && !S.showAddLog) {
+        S.todayData = { date: d.date, logs: d.logs||[], reflection: d.reflection||'', task_ids: d.task_ids||[] };
+        localStorage.setItem('day_'+S.today, JSON.stringify(S.todayData));
+        renderToday();
+      }
+      await loadRecordsList(); renderRecords();
+    })
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'tasks', filter: `user_id=eq.${uid}` }, async () => {
+      if (Date.now() - _selfSaveTs < 3000) return;
+      await loadTasks(); renderTasks(); renderToday();
+    })
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'goals', filter: `user_id=eq.${uid}` }, async () => {
+      if (Date.now() - _selfSaveTs < 3000) return;
+      await loadGoals(); renderGoals();
+    })
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'weeks', filter: `user_id=eq.${uid}` }, () => {
+      if (Date.now() - _selfSaveTs < 3000) return;
+      if (S.recMode === 'week') renderWeekView();
+    })
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'drafts', filter: `user_id=eq.${uid}` }, payload => {
+      if (Date.now() - _selfSaveTs < 3000 || !payload.new) return;
+      if (payload.new.key !== `log_${S.today}`) return;
+      const draft = payload.new.data;
+      if (document.getElementById('lf-form')?.contains(document.activeElement)) return;
+      S.logDraft = draft;
+      if (!S.showAddLog && draft?.title) toast('別の端末に下書きがあります — ＋追加で確認できます', 4000);
+    })
+    .subscribe();
+}
+
+let _draftTimer = null;
+function _scheduleDraftSave(pfx) {
+  clearTimeout(_draftTimer);
+  _draftTimer = setTimeout(async () => {
+    const draft = readLogForm(pfx);
+    S.logDraft = draft;
+    await _writeDraft(draft);
+  }, 3000);
+}
+async function _writeDraft(data) {
+  const key = `log_${S.today}`;
+  localStorage.setItem('draft_'+key, JSON.stringify(data));
+  if (!sb || !S.user) return;
+  _selfSaveTs = Date.now();
+  await sb.from('drafts').upsert({ user_id: S.user.id, key, data, updated_at: new Date().toISOString() }, { onConflict: 'user_id,key' });
+}
+async function _readDraft() {
+  const key = `log_${S.today}`;
+  if (sb && S.user) {
+    const { data } = await sb.from('drafts').select('data').eq('user_id', S.user.id).eq('key', key).maybeSingle();
+    if (data?.data) return data.data;
+  }
+  const local = localStorage.getItem('draft_'+key);
+  return local ? JSON.parse(local) : null;
+}
+async function _clearDraft() {
+  clearTimeout(_draftTimer);
+  S.logDraft = null;
+  const key = `log_${S.today}`;
+  localStorage.removeItem('draft_'+key);
+  if (!sb || !S.user) return;
+  _selfSaveTs = Date.now();
+  await sb.from('drafts').delete().eq('user_id', S.user.id).eq('key', key);
+}
+
+// =============================================
 // APP LAUNCH
 // =============================================
 async function launchApp() {
@@ -843,6 +922,7 @@ async function launchApp() {
   document.getElementById('app').hidden = false;
   await Promise.all([loadToday(), loadTasks(), loadRecordsList(), loadGoals()]);
   renderToday(); renderTasks(); renderRecords(); renderGoals();
+  setupRealtime();
 }
 
 // =============================================
@@ -863,6 +943,7 @@ async function loadToday() {
 }
 
 async function saveToday(silent = false) {
+  _selfSaveTs = Date.now();
   syncReflection();
   localStorage.setItem('day_'+S.today, JSON.stringify(S.todayData));
   if (!S.online || !sb) { enqueue('day', mkDayPayload(S.todayData)); if (!silent) toast('オフライン保存しました'); return; }
@@ -976,6 +1057,7 @@ async function loadRecordDate(date) {
 }
 
 async function saveRecordData(date, rd) {
+  _selfSaveTs = Date.now();
   const payload = mkDayPayload({ ...rd, date });
   localStorage.setItem('day_'+date, JSON.stringify({ date, logs: rd.logs, reflection: rd.reflection, task_ids: rd.task_ids||[] }));
   if (!S.online || !sb) { enqueue('day', payload); toast('オフライン保存しました'); return; }
@@ -1269,7 +1351,8 @@ function logForm(log, idx, ctx) {
 
   return `
     <div class="add-form ${isEdit?'':'mb-3'}" id="${pfx}-form"
-         onfocusout="_autoSaveLog('${pfx}','${ctx}','${isEdit}',${idx})">
+         onfocusout="_autoSaveLog('${pfx}','${ctx}','${isEdit}',${idx})"
+         ${!isEdit ? `oninput="_scheduleDraftSave('${pfx}')"` : ''}>
       <div class="time-row">
         <div class="time-row-item">
           <label>開始</label>
@@ -1329,7 +1412,14 @@ function logEntry(log, i, ctx) {
 }
 
 // ===== Log actions =====
-function toggleAddLog() { S.showAddLog = !S.showAddLog; if (!S.showAddLog) S.logDraft = null; renderToday(); }
+async function toggleAddLog() {
+  S.showAddLog = !S.showAddLog;
+  if (S.showAddLog && !S.logDraft) {
+    S.logDraft = await _readDraft();
+  }
+  if (!S.showAddLog) S.logDraft = null;
+  renderToday();
+}
 
 function readLogForm(pfx) {
   return {
@@ -1359,7 +1449,7 @@ function _autoSaveLog(pfx, ctx, isEditStr, idx) {
       } else {
         S.todayData.logs.push(l);
         S.showAddLog = false;
-        S.logDraft = null;
+        await _clearDraft();
         renderToday();
       }
       saveToday(true);
