@@ -371,6 +371,7 @@
     }
     .defer-tag.today-tag { background: #e6f4ee; color: #1D9E75; }
     .defer-tag.later-tag { background: var(--bg-input); color: var(--text-3); }
+    .defer-tag.expired-tag { background: rgba(239,68,68,.12); color: #ef4444; }
     @media (prefers-color-scheme: dark) {
       .defer-tag.today-tag { background: #0d2e1f; color: #1D9E75; }
     }
@@ -1514,6 +1515,7 @@ function taskItem(t, ctx) {
   const subs = t.subtasks || [];
   const isOpen = S.expanded.has(t.task_id);
   const deferred = !!t.deferred;
+  const isExpired = !t.done && !deferred && t.created_date && t.created_date < S.today;
 
   const subHTML = isOpen ? `
     <div class="subtask-list">
@@ -1536,12 +1538,11 @@ function taskItem(t, ctx) {
       <div class="task-row">
         <div class="task-dot" style="background:${CAT_COLOR[t.cat]||'#888780'}"></div>
         <div class="task-text${t.done?' done':''}" style="flex:1">${esc(t.text)}</div>
-        <button class="defer-tag ${deferred?'later-tag':'today-tag'}" onclick="doToggleDeferred('${t.task_id}','${ctx}')">${deferred?'後で':'今日'}</button>
+        <button class="defer-tag ${deferred?'later-tag':isExpired?'expired-tag':'today-tag'}" onclick="doToggleDeferred('${t.task_id}','${ctx}')">${deferred?'後で':isExpired?'期限切れ':'今日'}</button>
         <button class="expand-btn${isOpen?' open':''}" onclick="doToggleExpand('${t.task_id}','${ctx}')">${CHEV_SVG}</button>
         <button class="task-check${t.done?' checked':''}" onclick="doToggleTask('${t.task_id}','${ctx}')">
           ${t.done ? CHECK_SVG : ''}
         </button>
-        <button class="btn-icon" onclick="doDeleteTask('${t.task_id}','${ctx}')">${TRASH_SVG}</button>
       </div>
       ${subHTML}
     </div>`;
@@ -1566,7 +1567,9 @@ async function doToggleTask(tid, ctx) {
 async function doToggleDeferred(tid, ctx) {
   const t = S.tasks.find(x => x.task_id === tid);
   if (!t) return;
-  await updateTaskFields(tid, { deferred: !t.deferred });
+  const fields = { deferred: !t.deferred };
+  if (t.deferred) fields.created_date = S.today;
+  await updateTaskFields(tid, fields);
   if (ctx === 'today') renderToday(); else renderTasks();
 }
 
