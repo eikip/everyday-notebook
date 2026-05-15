@@ -1562,6 +1562,7 @@ function taskItem(t, ctx) {
         <button class="task-check${t.done?' checked':''}" onclick="doToggleTask('${t.task_id}','${ctx}')">
           ${t.done ? CHECK_SVG : ''}
         </button>
+        ${!t.done ? `<button class="btn-icon" onclick="doDeleteTask('${t.task_id}','${ctx}')">${TRASH_SVG}</button>` : ''}
       </div>
       ${subHTML}
     </div>`;
