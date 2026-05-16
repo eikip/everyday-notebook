@@ -757,6 +757,7 @@ const S = {
   online:      navigator.onLine,
   queue:       JSON.parse(localStorage.getItem('oq') || '[]'),
   expanded:    new Set(),
+  goalsExpanded: new Set(),
   recMode:     'day',       // 'day' | 'week'
   weekView:    null,        // 'YYYY-MM-DD' (Monday) | null
   weekData:    null,
@@ -1714,6 +1715,11 @@ function doToggleExpand(tid, ctx) {
   if (ctx === 'today') renderToday(); else renderTasks();
 }
 
+function toggleGoalExpand(gid) {
+  if (S.goalsExpanded.has(gid)) S.goalsExpanded.delete(gid); else S.goalsExpanded.add(gid);
+  renderGoals();
+}
+
 async function doAddSubtask(tid, ctx) {
   const inp = document.getElementById('sub-inp-' + tid);
   if (!inp) return;
@@ -2143,22 +2149,25 @@ function renderGoalCard(goal) {
     return acc + (kr.target > 0 ? Math.min(100, (kr.current||0)/kr.target*100) : 0);
   }, 0) / krs.length) : 0;
 
+  const isOpen = S.goalsExpanded.has(goal.goal_id);
   return `
     <div class="goal-card" data-goal-id="${goal.goal_id}">
-      <div class="goal-card-head">
-        <div>
+      <div class="goal-card-head" onclick="toggleGoalExpand('${goal.goal_id}')" style="cursor:pointer">
+        <div style="flex:1">
           <div class="goal-title" ondblclick="startEditGoal('${goal.goal_id}',event)" ontouchend="handleGoalTap('${goal.goal_id}',event)" style="cursor:text">${esc(goal.title)}</div>
           ${deadline ? `<div class="goal-meta">${deadline} · 達成率 ${totalPct}%</div>` : `<div class="goal-meta">達成率 ${totalPct}%</div>`}
         </div>
         <div class="goal-actions">
-          <button class="btn-icon" onclick="deleteGoalConfirm('${goal.goal_id}')" style="color:var(--danger)">${TRASH_SVG}</button>
+          <button class="expand-btn${isOpen?' open':''}" onclick="event.stopPropagation();toggleGoalExpand('${goal.goal_id}')">${CHEV_SVG}</button>
+          <button class="btn-icon" onclick="event.stopPropagation();deleteGoalConfirm('${goal.goal_id}')" style="color:var(--danger)">${TRASH_SVG}</button>
         </div>
       </div>
+      ${isOpen ? `
       ${krHTML}
       <div class="kr-add-row">
-        <input type="text" id="kr-inp-${goal.goal_id}" placeholder="Key Resultを追加..." style="flex:1;font-size:13px;padding:7px 10px" onkeypress="if(event.key==='Enter')addKRSimple('${goal.goal_id}')">
+        <input type="text" id="kr-inp-${goal.goal_id}" placeholder="達成基準を追加..." style="flex:1;font-size:13px;padding:7px 10px" onkeypress="if(event.key==='Enter')addKRSimple('${goal.goal_id}')">
         <button class="btn btn-sm btn-secondary" onclick="addKRSimple('${goal.goal_id}')">追加</button>
-      </div>
+      </div>` : ''}
     </div>`;
 }
 
