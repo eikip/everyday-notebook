@@ -761,6 +761,7 @@ const S = {
   expanded:    new Set(),
   subExpanded: new Set(),
   goalsExpanded: new Set(),
+  krExpanded:  new Set(),
   recMode:     'day',       // 'day' | 'week'
   weekView:    null,        // 'YYYY-MM-DD' (Monday) | null
   weekData:    null,
@@ -2185,6 +2186,25 @@ function renderGoals() {
 function renderGoalCard(goal) {
   const krs = goal.key_results || [];
   const krHTML = krs.length === 0 ? '' : krs.map((kr,i) => {
+    const krKey = goal.goal_id + '-' + i;
+    const krOpen = S.krExpanded.has(krKey);
+    const krSubs = kr.subtasks || [];
+    const subSection = `
+      ${krOpen ? `
+      <div class="subsub-list">
+        ${krSubs.map((s,j) => `
+          <div class="subsub-item">
+            <button class="subtask-check${s.done?' checked':''}" style="width:16px;height:16px;min-width:16px" onclick="doToggleKRSub('${goal.goal_id}',${i},${j})">
+              ${s.done ? CHECK_SVG_SM : ''}
+            </button>
+            <span class="subtask-text${s.done?' done':''}" style="flex:1;font-size:12px">${esc(s.text)}</span>
+            <button class="btn-icon" style="width:20px;height:20px" onclick="doDeleteKRSub('${goal.goal_id}',${i},${j})">${TRASH_SVG}</button>
+          </div>`).join('')}
+        <div class="add-sub-row">
+          <input type="text" id="krsub-inp-${goal.goal_id}-${i}" placeholder="サブ項目を追加..." style="font-size:12px" onkeypress="if(event.key==='Enter')doAddKRSub('${goal.goal_id}',${i})">
+          <button class="btn btn-sm btn-secondary" onclick="doAddKRSub('${goal.goal_id}',${i})">追加</button>
+        </div>
+      </div>` : ''}`;
     if (kr.is_binary) {
       return `
         <div class="kr-item">
@@ -2192,26 +2212,29 @@ function renderGoalCard(goal) {
             <button class="task-check${kr.done?' checked':''}" style="width:18px;height:18px" onclick="toggleKRBinary('${goal.goal_id}',${i})">
               ${kr.done ? CHECK_SVG_SM : ''}
             </button>
-            <span class="kr-text" style="${kr.done?'text-decoration:line-through;color:var(--text-3)':''}">${esc(kr.text)}</span>
+            <span class="kr-text" style="flex:1;${kr.done?'text-decoration:line-through;color:var(--text-3)':''}">${esc(kr.text)}</span>
+            <button class="expand-btn${krOpen?' open':''}" style="width:20px;height:20px" onclick="doToggleKRExpand('${goal.goal_id}',${i})">${CHEV_SVG}</button>
             <button class="btn-icon" style="width:24px;height:24px" onclick="deleteKR('${goal.goal_id}',${i})">${TRASH_SVG}</button>
           </div>
+          ${subSection}
         </div>`;
     }
     const pct = kr.target > 0 ? Math.min(100, Math.round((kr.current||0)/kr.target*100)) : 0;
     return `
       <div class="kr-item">
         <div class="kr-head">
-          <span class="kr-text">${esc(kr.text)}</span>
+          <span class="kr-text" style="flex:1">${esc(kr.text)}</span>
           <div style="display:flex;align-items:center;gap:4px">
             <span class="kr-val">${kr.current||0} / ${kr.target} ${esc(kr.unit||'')}</span>
-            <button class="btn-icon" style="width:24px;height:24px;color:var(--c-research)" onclick="promptKRProgress('${goal.goal_id}',${i})"
-              title="進捗更新">
+            <button class="btn-icon" style="width:24px;height:24px;color:var(--c-research)" onclick="promptKRProgress('${goal.goal_id}',${i})" title="進捗更新">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><path d="M12 4v16m8-8H4"/></svg>
             </button>
+            <button class="expand-btn${krOpen?' open':''}" style="width:20px;height:20px" onclick="doToggleKRExpand('${goal.goal_id}',${i})">${CHEV_SVG}</button>
             <button class="btn-icon" style="width:24px;height:24px" onclick="deleteKR('${goal.goal_id}',${i})">${TRASH_SVG}</button>
           </div>
         </div>
         <div class="progress-bar"><div class="progress-fill" style="width:${pct}%"></div></div>
+        ${subSection}
       </div>`;
   }).join('');
 
@@ -2328,6 +2351,52 @@ async function deleteKR(gid, idx) {
   if (!g) return;
   const krs = (g.key_results||[]).filter((_,i) => i !== idx);
   await updateKR(gid, krs);
+  renderGoals();
+}
+
+function doToggleKRExpand(gid, idx) {
+  const key = gid + '-' + idx;
+  if (S.krExpanded.has(key)) S.krExpanded.delete(key); else S.krExpanded.add(key);
+  S.goalsExpanded.add(gid);
+  renderGoals();
+}
+
+async function doAddKRSub(gid, idx) {
+  const inp = document.getElementById(`krsub-inp-${gid}-${idx}`);
+  if (!inp) return;
+  const text = inp.value.trim();
+  if (!text) return;
+  const g = S.goals.find(x => x.goal_id === gid);
+  if (!g) return;
+  const krs = [...(g.key_results||[])];
+  krs[idx] = { ...krs[idx], subtasks: [...(krs[idx].subtasks||[]), { id: Date.now(), text, done: false }] };
+  await updateKR(gid, krs);
+  S.goalsExpanded.add(gid);
+  S.krExpanded.add(gid + '-' + idx);
+  renderGoals();
+}
+
+async function doToggleKRSub(gid, idx, jdx) {
+  const g = S.goals.find(x => x.goal_id === gid);
+  if (!g) return;
+  const krs = [...(g.key_results||[])];
+  const subs = [...(krs[idx].subtasks||[])];
+  subs[jdx] = { ...subs[jdx], done: !subs[jdx].done };
+  krs[idx] = { ...krs[idx], subtasks: subs };
+  await updateKR(gid, krs);
+  S.goalsExpanded.add(gid);
+  S.krExpanded.add(gid + '-' + idx);
+  renderGoals();
+}
+
+async function doDeleteKRSub(gid, idx, jdx) {
+  const g = S.goals.find(x => x.goal_id === gid);
+  if (!g) return;
+  const krs = [...(g.key_results||[])];
+  krs[idx] = { ...krs[idx], subtasks: (krs[idx].subtasks||[]).filter((_,j) => j !== jdx) };
+  await updateKR(gid, krs);
+  S.goalsExpanded.add(gid);
+  S.krExpanded.add(gid + '-' + idx);
   renderGoals();
 }
 
