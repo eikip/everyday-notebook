@@ -1422,7 +1422,7 @@ function logEntry(log, i, ctx) {
       <div class="log-head">
         <div style="flex:1">
           ${(log.start||log.end) ? `<div class="log-time">${esc(log.start)}${log.end ? ' 〜 ' + (log.end==='進行中' ? '<span style="color:var(--c-research);font-size:11px;font-weight:600">進行中</span>' : esc(log.end)) : ''}</div>` : ''}
-          <div class="log-title">${esc(log.title)}</div>
+          <div class="log-title" ondblclick="startEditLog(${i},'${ctx}',event)" ontouchend="handleLogTap(${i},'${ctx}',event)" style="cursor:text">${esc(log.title)}</div>
         </div>
         <div class="log-actions">
           <button class="btn-icon" onclick="editLog(${i},'${ctx}')" title="編集">
@@ -1602,6 +1602,64 @@ async function doAddTodayTask() {
 async function doToggleTask(tid, ctx) {
   await toggleTask(tid);
   if (ctx === 'today') renderToday(); else renderTasks();
+}
+
+// ===== インライン編集ユーティリティ =====
+function _makeInlineInput(el, currentVal, onSave) {
+  const inp = document.createElement('input');
+  inp.type = 'text';
+  inp.value = currentVal;
+  inp.style.cssText = 'width:100%;font-size:inherit;font-weight:inherit;background:var(--bg-input);border:none;border-radius:6px;padding:2px 6px;color:var(--text-1);outline:2px solid var(--c-research)';
+  el.replaceWith(inp);
+  inp.focus(); inp.select();
+  const finish = () => { const v = inp.value.trim(); if (v) onSave(v); };
+  inp.addEventListener('blur', finish);
+  inp.addEventListener('keydown', e => {
+    if (e.key === 'Enter') inp.blur();
+    if (e.key === 'Escape') { inp.value = currentVal; inp.removeEventListener('blur', finish); inp.blur(); onSave(currentVal); }
+  });
+}
+
+// ===== 活動記録タイトル編集 =====
+const _logTapTs = {};
+function handleLogTap(i, ctx, e) {
+  const now = Date.now();
+  const key = `${ctx}-${i}`;
+  if (now - (_logTapTs[key] || 0) < 350) { e.preventDefault(); startEditLog(i, ctx, e); }
+  _logTapTs[key] = now;
+}
+function startEditLog(i, ctx, e) {
+  e?.stopPropagation();
+  const el = document.querySelector(`#le-${ctx}-${i} .log-title`);
+  if (!el) return;
+  const logs = ctx === 'today' ? S.todayData.logs : S.recData.logs;
+  const log = logs[i];
+  if (!log) return;
+  _makeInlineInput(el, log.title, async newTitle => {
+    log.title = newTitle;
+    if (ctx === 'today') await saveToday(true); else await saveRecordData(S.recView, S.recData);
+    if (ctx === 'today') renderToday(); else renderRecords();
+  });
+}
+
+// ===== 目標タイトル編集 =====
+const _goalTapTs = {};
+function handleGoalTap(gid, e) {
+  const now = Date.now();
+  if (now - (_goalTapTs[gid] || 0) < 350) { e.preventDefault(); startEditGoal(gid, e); }
+  _goalTapTs[gid] = now;
+}
+function startEditGoal(gid, e) {
+  e?.stopPropagation();
+  const goal = S.goals.find(g => g.goal_id === gid);
+  if (!goal) return;
+  const el = document.querySelector(`[data-goal-id="${gid}"] .goal-title`);
+  if (!el) return;
+  _makeInlineInput(el, goal.title, async newTitle => {
+    goal.title = newTitle;
+    await saveGoal(goal);
+    renderGoals();
+  });
 }
 
 const _taskTapTs = {};
@@ -2086,10 +2144,10 @@ function renderGoalCard(goal) {
   }, 0) / krs.length) : 0;
 
   return `
-    <div class="goal-card">
+    <div class="goal-card" data-goal-id="${goal.goal_id}">
       <div class="goal-card-head">
         <div>
-          <div class="goal-title">${esc(goal.title)}</div>
+          <div class="goal-title" ondblclick="startEditGoal('${goal.goal_id}',event)" ontouchend="handleGoalTap('${goal.goal_id}',event)" style="cursor:text">${esc(goal.title)}</div>
           ${deadline ? `<div class="goal-meta">${deadline} · 達成率 ${totalPct}%</div>` : `<div class="goal-meta">達成率 ${totalPct}%</div>`}
         </div>
         <div class="goal-actions">
