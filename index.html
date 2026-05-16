@@ -1576,7 +1576,7 @@ function taskItem(t, ctx) {
     <div class="task-wrap" id="ti-${t.task_id}">
       <div class="task-row">
         <div class="task-dot" style="background:${CAT_COLOR[t.cat]||'#888780'}"></div>
-        <div class="task-text${t.done?' done':''}" style="flex:1">${esc(t.text)}</div>
+        <div class="task-text${t.done?' done':''}" style="flex:1;cursor:${t.done?'default':'text'}" ondblclick="startEditTask('${t.task_id}','${ctx}')" ontouchend="handleTaskTap('${t.task_id}','${ctx}',event)">${esc(t.text)}</div>
         <button class="defer-tag ${deferred?'later-tag':isExpired?'expired-tag':'today-tag'}" onclick="doToggleDeferred('${t.task_id}','${ctx}')">${deferred?'後で':isExpired?'期限切れ':'今日'}</button>
         <button class="expand-btn${isOpen?' open':''}" onclick="doToggleExpand('${t.task_id}','${ctx}')">${CHEV_SVG}</button>
         <button class="task-check${t.done?' checked':''}" onclick="doToggleTask('${t.task_id}','${ctx}')">
@@ -1602,6 +1602,44 @@ async function doAddTodayTask() {
 async function doToggleTask(tid, ctx) {
   await toggleTask(tid);
   if (ctx === 'today') renderToday(); else renderTasks();
+}
+
+const _taskTapTs = {};
+function handleTaskTap(tid, ctx, e) {
+  const now = Date.now();
+  if (now - (_taskTapTs[tid] || 0) < 350) {
+    e.preventDefault();
+    startEditTask(tid, ctx);
+  }
+  _taskTapTs[tid] = now;
+}
+
+function startEditTask(tid, ctx) {
+  const t = S.tasks.find(x => x.task_id === tid);
+  if (!t || t.done) return;
+  const wrap = document.getElementById(`ti-${tid}`);
+  if (!wrap) return;
+  const textEl = wrap.querySelector('.task-text');
+  if (!textEl) return;
+  const inp = document.createElement('input');
+  inp.type = 'text';
+  inp.value = t.text;
+  inp.style.cssText = 'flex:1;font-size:15px;background:var(--bg-input);border:none;border-radius:6px;padding:2px 6px;color:var(--text-1);outline:2px solid var(--c-research)';
+  textEl.replaceWith(inp);
+  inp.focus();
+  inp.select();
+  const save = async () => {
+    const newText = inp.value.trim();
+    if (newText && newText !== t.text) {
+      await updateTaskFields(tid, { text: newText });
+    }
+    if (ctx === 'today') renderToday(); else renderTasks();
+  };
+  inp.addEventListener('blur', save);
+  inp.addEventListener('keydown', e => {
+    if (e.key === 'Enter') inp.blur();
+    if (e.key === 'Escape') { inp.value = t.text; inp.blur(); }
+  });
 }
 
 async function doToggleDeferred(tid, ctx) {
