@@ -384,6 +384,8 @@
     .subtask-list { padding: 4px 16px 8px 38px; border-bottom: 1px solid var(--border); }
     .subtask-list:last-child { border-bottom: none; }
     .subtask-item { display: flex; align-items: center; gap: 8px; padding: 5px 0; }
+    .subsub-list { padding: 2px 0 4px 28px; }
+    .subsub-item { display: flex; align-items: center; gap: 6px; padding: 4px 0; }
     .subtask-check {
       width: 16px; height: 16px; border: 1.5px solid var(--border);
       border-radius: 3px; cursor: pointer; flex-shrink: 0;
@@ -757,6 +759,7 @@ const S = {
   online:      navigator.onLine,
   queue:       JSON.parse(localStorage.getItem('oq') || '[]'),
   expanded:    new Set(),
+  subExpanded: new Set(),
   goalsExpanded: new Set(),
   recMode:     'day',       // 'day' | 'week'
   weekView:    null,        // 'YYYY-MM-DD' (Monday) | null
@@ -1559,14 +1562,37 @@ function taskItem(t, ctx) {
 
   const subHTML = isOpen ? `
     <div class="subtask-list">
-      ${subs.map((s,i) => `
-        <div class="subtask-item">
-          <button class="subtask-check${s.done?' checked':''}" onclick="doToggleSubtask('${t.task_id}',${i},'${ctx}')">
-            ${s.done ? CHECK_SVG_SM : ''}
-          </button>
-          <span class="subtask-text${s.done?' done':''}">${esc(s.text)}</span>
-          <button class="btn-icon" style="width:24px;height:24px" onclick="doDeleteSubtask('${t.task_id}',${i},'${ctx}')">${TRASH_SVG}</button>
-        </div>`).join('')}
+      ${subs.map((s,i) => {
+        const subKey = t.task_id + '-' + i;
+        const subOpen = S.subExpanded.has(subKey);
+        const subSubs = s.subtasks || [];
+        return `
+        <div>
+          <div class="subtask-item">
+            <button class="subtask-check${s.done?' checked':''}" onclick="doToggleSubtask('${t.task_id}',${i},'${ctx}')">
+              ${s.done ? CHECK_SVG_SM : ''}
+            </button>
+            <span class="subtask-text${s.done?' done':''}" style="flex:1">${esc(s.text)}</span>
+            <button class="expand-btn${subOpen?' open':''}" style="width:20px;height:20px" onclick="doToggleSubExpand('${t.task_id}',${i},'${ctx}')">${CHEV_SVG}</button>
+            <button class="btn-icon" style="width:24px;height:24px" onclick="doDeleteSubtask('${t.task_id}',${i},'${ctx}')">${TRASH_SVG}</button>
+          </div>
+          ${subOpen ? `
+          <div class="subsub-list">
+            ${subSubs.map((ss,j) => `
+              <div class="subsub-item">
+                <button class="subtask-check${ss.done?' checked':''}" style="width:16px;height:16px;min-width:16px" onclick="doToggleSubSubtask('${t.task_id}',${i},${j},'${ctx}')">
+                  ${ss.done ? CHECK_SVG_SM : ''}
+                </button>
+                <span class="subtask-text${ss.done?' done':''}" style="flex:1;font-size:12px">${esc(ss.text)}</span>
+                <button class="btn-icon" style="width:20px;height:20px" onclick="doDeleteSubSubtask('${t.task_id}',${i},${j},'${ctx}')">${TRASH_SVG}</button>
+              </div>`).join('')}
+            <div class="add-sub-row">
+              <input type="text" id="subsub-inp-${t.task_id}-${i}" placeholder="サブタスクを追加..." style="font-size:12px" onkeypress="if(event.key==='Enter')doAddSubSubtask('${t.task_id}',${i},'${ctx}')">
+              <button class="btn btn-sm btn-secondary" onclick="doAddSubSubtask('${t.task_id}',${i},'${ctx}')">追加</button>
+            </div>
+          </div>` : ''}
+        </div>`;
+      }).join('')}
       <div class="add-sub-row">
         <input type="text" id="sub-inp-${t.task_id}" placeholder="サブタスクを追加..." onkeypress="if(event.key==='Enter')doAddSubtask('${t.task_id}','${ctx}')">
         <button class="btn btn-sm btn-secondary" onclick="doAddSubtask('${t.task_id}','${ctx}')">追加</button>
@@ -1749,6 +1775,52 @@ async function doDeleteSubtask(tid, idx, ctx) {
   const subs = (t.subtasks || []).filter((_,i) => i !== idx);
   await updateTaskFields(tid, { subtasks: subs });
   S.expanded.add(tid);
+  if (ctx === 'today') renderToday(); else renderTasks();
+}
+
+function doToggleSubExpand(tid, idx, ctx) {
+  const key = tid + '-' + idx;
+  if (S.subExpanded.has(key)) S.subExpanded.delete(key); else S.subExpanded.add(key);
+  S.expanded.add(tid);
+  if (ctx === 'today') renderToday(); else renderTasks();
+}
+
+async function doAddSubSubtask(tid, idx, ctx) {
+  const inp = document.getElementById(`subsub-inp-${tid}-${idx}`);
+  if (!inp) return;
+  const text = inp.value.trim();
+  if (!text) return;
+  const t = S.tasks.find(x => x.task_id === tid);
+  if (!t) return;
+  const subs = [...(t.subtasks || [])];
+  subs[idx] = { ...subs[idx], subtasks: [...(subs[idx].subtasks || []), { id: Date.now(), text, done: false }] };
+  await updateTaskFields(tid, { subtasks: subs });
+  S.expanded.add(tid);
+  S.subExpanded.add(tid + '-' + idx);
+  if (ctx === 'today') renderToday(); else renderTasks();
+}
+
+async function doToggleSubSubtask(tid, idx, jdx, ctx) {
+  const t = S.tasks.find(x => x.task_id === tid);
+  if (!t) return;
+  const subs = [...(t.subtasks || [])];
+  const subSubs = [...(subs[idx].subtasks || [])];
+  subSubs[jdx] = { ...subSubs[jdx], done: !subSubs[jdx].done };
+  subs[idx] = { ...subs[idx], subtasks: subSubs };
+  await updateTaskFields(tid, { subtasks: subs });
+  S.expanded.add(tid);
+  S.subExpanded.add(tid + '-' + idx);
+  if (ctx === 'today') renderToday(); else renderTasks();
+}
+
+async function doDeleteSubSubtask(tid, idx, jdx, ctx) {
+  const t = S.tasks.find(x => x.task_id === tid);
+  if (!t) return;
+  const subs = [...(t.subtasks || [])];
+  subs[idx] = { ...subs[idx], subtasks: (subs[idx].subtasks || []).filter((_,j) => j !== jdx) };
+  await updateTaskFields(tid, { subtasks: subs });
+  S.expanded.add(tid);
+  S.subExpanded.add(tid + '-' + idx);
   if (ctx === 'today') renderToday(); else renderTasks();
 }
 
