@@ -1,4 +1,4 @@
-const CACHE = 'furikaeri-v16';
+const CACHE = 'furikaeri-v17';
 const PRECACHE = [
   './manifest.json',
   'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js',
